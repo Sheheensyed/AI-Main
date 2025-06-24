@@ -7,6 +7,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import { DeviceProvider } from './context/Temp.jsx'
 import { MappedStepsProvider } from './context/MappedStepContext.jsx'
 import { CaseProvider } from './context/CaseContext.jsx'
+import { StepProvider } from './context/StepContext.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -14,7 +15,9 @@ createRoot(document.getElementById('root')).render(
       <DeviceProvider>
         <MappedStepsProvider>
           <CaseProvider>
-            <App />
+            <StepProvider>
+              <App />
+            </StepProvider>
           </CaseProvider>
         </MappedStepsProvider>
       </DeviceProvider>
