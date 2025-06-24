@@ -1,0 +1,11 @@
+# Node.js dependencies
+Test-UI/node_modules/
+Test-Server/node_modules/
+
+# Python stuff
+FastAPI/__pycache__/
+FastAPI/venv/
+
+# Environment files
+*.env
+ 
