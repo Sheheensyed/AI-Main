@@ -117,9 +117,7 @@ function Search() {
         try {
             const id = caseId || localStorage.getItem("caseId");
             const cleanedSteps = steps.filter(step => step.trim() !== "");
-
             const response = await mapSteps(id, cleanedSteps);
-
             if (response.data && response.data.case_id) {
                 const updatedCase = await getSingleCase(response.data.case_id); // 👈 fetch updated case
                 setCaseId(updatedCase._id);
@@ -132,7 +130,6 @@ function Search() {
             console.log(error);
         }
     };
-
     return (
         <>
             <div className='d-flex vh-100 w-100 justify-content-center align-items-center flex-column'>
