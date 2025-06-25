@@ -67,6 +67,7 @@ exports.getCase = async (req, res) => {
         const { id } = req.params;
         const foundCase = await Case.findById(id);
         res.json(foundCase);
+        console.log("Fetched Case:", foundCase);
     } catch (err) {
         res.status(404).json({ error: 'Case not found' });
     }

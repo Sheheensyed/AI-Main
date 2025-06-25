@@ -1,27 +1,46 @@
-import { useStepContext } from "../context/StepContext";
+import React, { useEffect } from 'react';
+import { useStepContext } from '../context/StepContext';
+import { getSingleCase } from '../services/allApi';
+import { useParams } from 'react-router-dom';
 
 function List() {
-    const { steps } = useStepContext();
+    const { steps, setSteps } = useStepContext();
+    const { caseId } = useParams();
+
+    useEffect(() => {
+        const fetchCase = async () => {
+            try {
+                const response = await getSingleCase(caseId);
+                console.log("📦 Full response from getSingleCase:", response);
+
+                // Safely access steps
+                const fetchedSteps = response?.data?.steps;
+                if (Array.isArray(fetchedSteps)) {
+                    setSteps(fetchedSteps);
+                } else {
+                    console.warn("⚠️ No steps array found in response:", response.data);
+                }
+            } catch (err) {
+                console.error("❌ Error fetching case:", err);
+            }
+        };
+
+        if (caseId) fetchCase();
+    }, [caseId, setSteps]);
 
     return (
-        <>
-            <div className="container">
-                <div className="row">
-                    <div className="col-md-5 col-lg-4">
-                        <ul>
-                            {steps && steps.length > 0 ? (
-                                steps.map((item, index) => (
-                                    <li key={index}>{item}</li>
-                                ))
-                            ) : (
-                                <li>No steps found</li>
-                            )}
-                        </ul>
-                    </div>
-                    <div className="col-md-7 col-lg-8">2</div>
-                </div>
-            </div>
-        </>
+        <div className="container mt-5">
+            <h3>Original Steps</h3>
+            {Array.isArray(steps) && steps.length > 0 ? (
+                <ol>
+                    {steps.map((step, i) => (
+                        <li key={i}>{step}</li>
+                    ))}
+                </ol>
+            ) : (
+                <p>No steps found.</p>
+            )}
+        </div>
     );
 }
 

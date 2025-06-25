@@ -6,7 +6,7 @@ export const DeviceProvider = ({ children }) => {
     const [device, setDevice] = useState(localStorage.getItem('Device') || '')
     const [model, setModel] = useState(localStorage.getItem('Model') || '')
     const [caseId, setCaseId] = useState(null);
-    // const [mappedSteps, setMappedSteps] = useState([])
+    const [mappedSteps, setMappedSteps] = useState([])
 
     useEffect(() => {
         localStorage.setItem('Device', device)
@@ -25,7 +25,7 @@ export const DeviceProvider = ({ children }) => {
 
 
     return (
-        <DeviceContext.Provider value={{ device, setDevice, model, setModel, caseId, setCaseId }}>
+        <DeviceContext.Provider value={{ device, setDevice, model, setModel, caseId, setCaseId, mappedSteps, setMappedSteps }}>
             {children}
         </DeviceContext.Provider>
     );

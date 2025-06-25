@@ -13,31 +13,12 @@ function Search() {
     const { device, setDevice, model, setModel } = useContext(DeviceContext)
     const navigate = useNavigate()
     const [error, setError] = useState(false)
-    // const [deviceError,setDeviceError]=useState(false)
-
-    const handleCheck = () => {
-        if (!device && !model) {
-            // setDeviceError(true)
-            setError(!device)
-            // alert('Please Select any Options')
-        } else {
-            setError(false)
-            navigate('/lists')
-        }
-    }
-
-    const isDisabled = !device && !model
-
+    const { steps, setSteps } = useStepContext();
     const [loading, setLoading] = useState(false)
     const [editSteps, setEditSteps] = useState('')
     const [caseId, setCaseId] = useState('');
-    // const { setSteps } = useStepContext();
-
-    const [executionResult, setExecutionResult] = useState('');
-    const [showExecModal, setShowExecModal] = useState(false);
     const { setMappedSteps } = useMappedSteps();
     const [show, setShow] = useState(false);
-    const [steps,setSteps]=useState('')
 
     const handleSaveChanges = async () => {
         try {
@@ -142,8 +123,10 @@ function Search() {
             if (response.data && response.data.case_id) {
                 const updatedCase = await getSingleCase(response.data.case_id); // 👈 fetch updated case
                 setCaseId(updatedCase._id);
-                setMappedSteps(updatedCase.mapped_steps); // 👈 set from fresh data
-                // navigate('/mapped');
+                setSteps(updatedCase.steps); // 👈 just in case steps changed
+                console.log("Steps from backend:", Array.isArray(response.data.steps), response.data.steps);
+                setMappedSteps(updatedCase.mapped_steps); // 👈 set mapped steps
+                navigate(`/lists/${response.data.case_id}`); // ✅ Go to /list after successful mapping
             }
         } catch (error) {
             console.log(error);
@@ -170,39 +153,11 @@ function Search() {
                         <option value="Moto">Moto</option>
                         <option value="Samsung">Samsung</option>
                     </select>
-                    {/* 
-                    <h5 className='mt-4'>Select Hardware ID</h5>
-                    <select className="form-select" value={model} onChange={(e) => setModel(e.target.value)} style={{
-                        width: "100%", padding: "8px", borderRadius: "5px", border: "1px solid #ccc", appearance: "none", // removes default arrow in some browsers
-                    }}
-                    >
-                        <option value="" disabled>
-                            Choose Model
-                        </option>
-                        <option value="16 Pro">16 Pro</option>
-                        <option value="15 Pro Max">15 Pro Max</option>
-                        <option value="2A">2A</option>
-                        <option value="5G">5G</option>
-                    </select> */}
 
-                    {/* <button className={`btn ${isDisabled ? 'btn-secondary' : 'btn-primary'} w-100 my-2`} >Run Saved Script</button> */}
-                    {/* <button className={`btn ${isDisabled ? 'btn-secondary' : 'btn-primary'} w-100 mt-2'`} onClick={handleCheck}>Continue to Test Generation</button> */}
-
-
-                    {/* <div className='mt-3'>
-                        <h5>Your Selections</h5>
-
-                        <div className='d-flex'>
-                            <div className=''>Device : {device || 'Not Selected'} </div>
-                            <div className='mx-5'> Model : {model || 'Not Selected'} </div>
-                        </div>
-                    </div> */}
 
                 </div>
 
-                {/* <div className='d-flex justify-content-center align-items-center vh-100 w-100 flex-column'> */}
-                {/* <p className=''>  <strong>Selected Device :</strong> {device}</p> */}
-                {/* <p className=''><strong>Selected Model :</strong> {model}</p> */}
+
                 <div className='text-center w-50 my-3'>
                     <textarea type="text" name="" placeholder='Enter Input' className='form-control' onChange={(e) => { setUserQuery(e.target.value) }} />
                     <button className='btn btn-success mx-3 my-3 px-5' onClick={handleSubmit}>Generate</button>
@@ -237,7 +192,6 @@ function Search() {
                     </div>
                 }
 
-                {/* </div> */}
 
                 {/* Edit */}
                 <Modal show={show} onHide={handleClose}>
@@ -271,21 +225,6 @@ function Search() {
                         </Button>
                         <Button variant="primary" onClick={handleSaveChanges}>
                             Save Changes
-                        </Button>
-                    </Modal.Footer>
-                </Modal>
-
-                {/* Execute */}
-                <Modal show={showExecModal} onHide={() => setShowExecModal(false)}>
-                    <Modal.Header closeButton>
-                        <Modal.Title>Execution Result</Modal.Title>
-                    </Modal.Header>
-                    <Modal.Body>
-                        <p>{executionResult}</p>
-                    </Modal.Body>
-                    <Modal.Footer>
-                        <Button variant="secondary" onClick={() => setShowExecModal(false)}>
-                            Close
                         </Button>
                     </Modal.Footer>
                 </Modal>

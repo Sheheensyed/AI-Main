@@ -1,17 +1,17 @@
 import { createContext, useContext, useState } from "react";
 
-const stepContext = createContext()
+const StepContext = createContext()
 
 export const StepProvider = ({ children }) => {
-    const [step, setStep] = useState('')
+    const [steps, setSteps] = useState([])
 
     return (
 
-        <stepContext.Provider value={{ step, setStep }}>
+        <StepContext.Provider value={{ steps, setSteps }}>
             {children}
-        </stepContext.Provider>
+        </StepContext.Provider>
 
     )
 }
 
-export const useStepContext = () => useContext(stepContext);
+export const useStepContext = () => useContext(StepContext);
