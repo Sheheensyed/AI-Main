@@ -14,8 +14,6 @@ function App() {
       <Routes>
           <Route path='/' element={<Search/>}/>
           <Route path='/lists/:id' element={<Execute/>}/>
-          <Route path='/map' element={<Map/>}/>
-          <Route path='/mapped' element={<Mapped_steps/>}/>
       </Routes>
     <Footer/>
     </>

@@ -6,19 +6,17 @@ import { BrowserRouter } from 'react-router-dom'
 import 'bootstrap/dist/css/bootstrap.min.css';
 import { DeviceProvider } from './context/Temp.jsx'
 import { MappedStepsProvider } from './context/MappedStepContext.jsx'
-import { CaseProvider } from './context/CaseContext.jsx'
 import { StepProvider } from './context/StepContext.jsx'
+import 'bootstrap-icons/font/bootstrap-icons.css';
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <DeviceProvider>
         <MappedStepsProvider>
-          <CaseProvider>
             <StepProvider>
               <App />
             </StepProvider>
-          </CaseProvider>
         </MappedStepsProvider>
       </DeviceProvider>
     </BrowserRouter>
