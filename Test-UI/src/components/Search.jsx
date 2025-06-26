@@ -1,4 +1,4 @@
-import React, { useContext, useState } from 'react'
+import React, { useContext, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import DeviceContext from '../context/Temp';
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
@@ -19,6 +19,8 @@ function Search() {
     const [caseId, setCaseId] = useState('');
     const { setMappedSteps } = useMappedSteps();
     const [show, setShow] = useState(false);
+    const [showSteps, setShowSteps] = useState(false);
+
 
     const handleSaveChanges = async () => {
         try {
@@ -57,12 +59,17 @@ function Search() {
 
     const handleSubmit = async () => {
         setLoading(true)
+        setShowSteps(false)
         const add = {
             device: device,
             model: model,
             user_query: userQuery
         };
 
+        if (!device) {
+            setError(true)
+            return;
+        }
         try {
             console.log("Payload being sent:", add);
 
@@ -75,6 +82,7 @@ function Search() {
             } else {
                 console.log(`Unexpected Response : `, response);
             }
+            setShowSteps(true)
         } catch (error) {
             console.log(`Error saving to backend :`, error);
         }
@@ -130,19 +138,25 @@ function Search() {
             console.log(error);
         }
     };
+
+    useEffect(() => {
+        setDevice('');
+        setError(false)
+        // localStorage.removeItem('caseId')
+    }, []);
     return (
         <>
             <div className='d-flex vh-100 w-100 justify-content-center align-items-center flex-column'>
 
-                <div className='border border-2 m-0 p-3 w-50 rounded-5' >
+                <div className='border border-1 m-0 p-3 w-50 rounded-2' >
                     <h3 className='text-center fw-bold'>Device Configuration</h3>
 
                     <h5 className='mt-4'>Select Device Under Test (DUT) <span className='text-danger'>*</span> </h5>
 
-                    <select className={`form-select ${error ? 'border border-danger border-2' : device ? 'border border-primary border-1' : ''}`} value={device} onChange={(e) => { setDevice(e.target.value); if (e.target.value) { setError(false) } }} style={{
+                    <select className={`form-select ${error ? 'border border-danger border-2' : device ? 'border border-primary border-1' : ''}`} value={device} onChange={(e) => { setDevice(e.target.value); setError(false) }} style={{
                         width: "100%", padding: "8px", borderRadius: "5px", border: "1px solid #ccc", appearance: "none", // removes default arrow in some browsers
                     }}>
-                        <option value="" disabled>
+                        <option value="" hidden>
                             Choose a DUT Type
                         </option>
                         <option value="IPhone">Iphone</option>
@@ -154,21 +168,26 @@ function Search() {
 
                 </div>
 
+                <form className='w-50 text-center my-3' onSubmit={(e) => { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } }}>
+                    <textarea type="text" name="" placeholder='Enter Input' className='form-control' onChange={(e) => setUserQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } } }} />
+                    <button className={`btn ${(!userQuery || !device) ? 'btn-secondary' : 'btn-success'}  mx-3 my-3 px-5 gap-2 `} disabled={!userQuery || !device || loading}>Generate</button>
+                </form>
 
-                <div className='text-center w-50 my-3'>
-                    <textarea type="text" name="" placeholder='Enter Input' className='form-control' onChange={(e) => { setUserQuery(e.target.value) }} />
-                    <button className='btn btn-success mx-3 my-3 px-5' onClick={handleSubmit}>Generate</button>
-                </div>
-
-                {steps?.length > 0 ?
+                {loading ? (
+                    <div className="d-flex justify-content-center align-items-center mt-4">
+                        <div className="spinner-border text-primary" role="status">
+                            <span className="visually-hidden">Loading...</span>
+                        </div>
+                        <span className="ms-2 text-primary">Generating steps...</span>
+                    </div>
+                ) : steps?.length > 0 ? (
                     <div className='border border-2 w-75 p-3'>
                         <h5 className='text-center'>Steps to Generate The Automation</h5>
 
                         <ol>
                             {steps.map((item, index) => (
                                 <li className='text-center' key={index}> {item} </li>
-                            ))
-                            }
+                            ))}
                         </ol>
 
                         <div className='d-flex justify-content-center align-items-center'>
@@ -176,18 +195,8 @@ function Search() {
                             <button className='btn btn-success mx-3' onClick={handleExecute}>Build</button>
                         </div>
                     </div>
-                    :
-                    <div>
-                        {/* <h3 className='text-center'>Step Not Available Yet!</h3> */}
-                    </div>
-                }
+                ) : null}
 
-                {loading &&
-                    <div className="flex justify-center items-center mt-4">
-                        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-blue-500"></div>
-                        <span className="ml-2 text-blue-600">Generating...</span>
-                    </div>
-                }
 
 
                 {/* Edit */}

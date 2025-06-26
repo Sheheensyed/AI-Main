@@ -8,15 +8,17 @@ import { DeviceProvider } from './context/Temp.jsx'
 import { MappedStepsProvider } from './context/MappedStepContext.jsx'
 import { StepProvider } from './context/StepContext.jsx'
 import 'bootstrap-icons/font/bootstrap-icons.css';
+import 'animate.css';
+
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <BrowserRouter>
       <DeviceProvider>
         <MappedStepsProvider>
-            <StepProvider>
-              <App />
-            </StepProvider>
+          <StepProvider>
+            <App />
+          </StepProvider>
         </MappedStepsProvider>
       </DeviceProvider>
     </BrowserRouter>
