@@ -6,15 +6,17 @@ function Center_Panel() {
     return (
         <>
 
-            <div  style={{height:'100%',position:'relative'}}>
+            <div style={{ height: '100%', position: 'relative' }}>
                 {/* Live Cam */}
+              
                 <Live_Cam />
+
                 {/* Console Panel */}
                 <Console />
             </div>
 
-                
-               
+
+
 
         </>
     )

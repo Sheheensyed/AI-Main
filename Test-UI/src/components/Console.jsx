@@ -1,12 +1,34 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import Button from 'react-bootstrap/Button';
+import { useCaseContext } from '../context/CaseContext';
 
 function Console() {
     const [consoleHeight, setConsoleHeight] = useState(200);
     const [consoleVisible, setConsoleVisible] = useState(true);
+    const { consoleLog, setConsoleLog, mappedSteps } = useCaseContext();
+    const consoleRef = useRef(null);
+
+    // Push message only once when mappedSteps is available
+    useEffect(() => {
+        if (mappedSteps && mappedSteps.length > 0) {
+            setConsoleLog((prev) => {
+                if (!prev.includes('Steps Generated Successfully...')) {
+                    return ['Steps Generated Successfully...', ...prev];
+                }
+                return prev;
+            });
+        }
+    }, [mappedSteps]);
+
+    // Auto-scroll to bottom on log update
+    useEffect(() => {
+        if (consoleRef.current) {
+            consoleRef.current.scrollTop = consoleRef.current.scrollHeight;
+        }
+    }, [consoleLog]);
+
     return (
         <>
-
             {consoleVisible && (
                 <div
                     style={{
@@ -26,11 +48,7 @@ function Console() {
                 >
                     {/* Resizer Bar */}
                     <div
-                        style={{
-                            height: '5px',
-                            cursor: 'row-resize',
-                            background: '#555',
-                        }}
+                        style={{ height: '5px', cursor: 'row-resize', background: '#555' }}
                         onMouseDown={(e) => {
                             const startY = e.clientY;
                             const startHeight = consoleHeight;
@@ -51,10 +69,16 @@ function Console() {
                     />
 
                     {/* Console Output */}
-                    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
+                    <div ref={consoleRef} style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                         <h6 className="text-center" style={{ color: '#fff' }}>Console Output</h6>
                         <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-                            Connecting to robot...
+                          
+                           {consoleLog.length>0? consoleLog.map((step,index)=>(
+                            <span className='' key={index}>{step}</span>
+                           )):
+                           <span>No Steps Generated...</span>
+                           }
+                           
                             {"\n"}Step 1: Power on device
                             {"\n"}Step 2: Initializing...
                             {"\n"}Step 3: Running tests...
@@ -78,7 +102,6 @@ function Console() {
             >
                 {consoleVisible ? 'Hide Console' : 'Show Console'}
             </Button>
-
         </>
     )
 }

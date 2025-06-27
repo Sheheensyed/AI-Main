@@ -16,12 +16,14 @@ import Center_Panel from '../components/Center_Panel';
 import Right_Panel from '../components/Right_Panel';
 
 function Execute() {
-    const { id: caseId } = useParams(); 
+    const { id: caseId } = useParams();
     const [steps, setSteps] = useState([]);
     const [mappedSteps, setMappedSteps] = useState([]);
     const [query, setQuery] = useState('');
     const [count, setCount] = useState(0);
-  
+    const [consoleLog, setConsoleLog] = useState([])
+
+
 
     useEffect(() => {
         const fetchCase = async () => {
@@ -41,9 +43,9 @@ function Execute() {
 
     return (
         <>
-            <Navbar className="bg-body-tertiary">
+            <Navbar className="bg-body-tertiary" fixed='top' style={{ zIndex: '1' }}>
                 <Container>
-                    <Navbar.Brand href="" className='d-flex justify-content-between w-100'>
+                    <Navbar.Brand className='d-flex justify-content-between w-100'>
                         <img alt="" src={logo} width="100" height="30" className="d-inline-block align-top" />
                         <div className='d-flex justify-content-between align-items-center border border-2 rounded-3 px-1' id='toolbar'>
                             {/* <div className='mx-3'><FontAwesomeIcon className='text-primary' icon={faMobileScreenButton} /></div> */}
@@ -54,16 +56,16 @@ function Execute() {
                         </div>
 
                         <div>
-                            <button className='btn btn-outline-primary'>go home</button>
+                            <button className='btn btn-outline-primary'>Home</button>
                         </div>
                     </Navbar.Brand>
                 </Container>
             </Navbar>
 
 
-            <CaseContext.Provider value={{ steps, query, count, mappedSteps }}>
-                <div style={{ height: '100vh' }}>
-                    <SplitPane split="vertical" defaultSize="25%" minSize={200}>
+            <CaseContext.Provider value={{ steps, query, count, mappedSteps, consoleLog, setConsoleLog }}>
+                <div style={{ height: '100vh' }} className='mt-5'>
+                    <SplitPane split="vertical" defaultSize="25%" minSize={200} style={{ zIndex: '0' }}>
                         {/* Left Panel: Generated Steps */}
                         <Left_Panel />
 

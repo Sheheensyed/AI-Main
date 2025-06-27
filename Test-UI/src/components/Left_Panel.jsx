@@ -5,10 +5,11 @@ import { useCaseContext } from '../context/CaseContext';
 
 function Left_Panel() {
     const { mappedSteps, query, count,steps } = useCaseContext()
+
     return (
         <>
 
-            <div className="p-3 border-end" style={{ height: '100%', overflowY: 'auto' }}>
+            <div className="p-3 border-end mt-3" style={{ height: '100%', overflowY: 'auto' }}>
                 <div>
                     <div className='d-flex justify-content-between'>
                         <h5 className='m-auto'>Generated Steps</h5>
