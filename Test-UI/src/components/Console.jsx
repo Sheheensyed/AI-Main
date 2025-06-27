@@ -72,17 +72,14 @@ function Console() {
                     <div ref={consoleRef} style={{ flex: 1, overflowY: 'auto', padding: '1rem' }}>
                         <h6 className="text-center" style={{ color: '#fff' }}>Console Output</h6>
                         <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>
-                          
-                           {consoleLog.length>0? consoleLog.map((step,index)=>(
-                            <span className='' key={index}>{step}</span>
-                           )):
-                           <span>No Steps Generated...</span>
-                           }
+
+                            {consoleLog.length > 0 ? [...consoleLog].reverse().map((step, index) => (
+                                <div className='' key={index}>{step}  </div>
+                            )) :
+                                <span>No Steps Generated...</span>
+                            }
+
                            
-                            {"\n"}Step 1: Power on device
-                            {"\n"}Step 2: Initializing...
-                            {"\n"}Step 3: Running tests...
-                            {"\n"}✅ All systems operational.
                         </pre>
                     </div>
                 </div>
