@@ -4,7 +4,8 @@ import Button from 'react-bootstrap/Button';
 import { useCaseContext } from '../context/CaseContext';
 
 function Left_Panel() {
-    const { mappedSteps, query, count,steps } = useCaseContext()
+    const { mappedSteps, query, count, steps } = useCaseContext()
+    const { active, setActive } = useCaseContext()
 
     return (
         <>

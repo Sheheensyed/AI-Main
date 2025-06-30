@@ -5,25 +5,30 @@ function Live_Cam() {
     const { mappedSteps, setConsoleLog } = useCaseContext();
 
     const ExecuteStepOneByOne = async () => {
-        if (!mappedSteps || mappedSteps.length===0){
-            setConsoleLog(prev=>[`❌ No Step Found To Execute`,...prev]);
+        if (!mappedSteps || mappedSteps.length === 0) {
+
+            setTimeout(() => {
+
+                setConsoleLog(prev => [`❌ No Step Found To Execute`, ...prev]);
+            }, 1000);
+
             return;
         }
 
-        for (let i=0;i<mappedSteps.length;i++){
+        for (let i = 0; i < mappedSteps.length; i++) {
             const step = mappedSteps[i];
 
             // Log : Step executing
-            setConsoleLog(prev=>[`⚙️ Step ${i+1} Executing:${JSON.stringify(step.step)}`,...prev]) 
+            setConsoleLog(prev => [`⚙️ Step  ${i + 1} Executing:${step.step}`, ...prev])
 
             //Step execution (delay 2sec)
-            await new Promise(res=>setTimeout(res,2000))
+            await new Promise(res => setTimeout(res, 2000))
 
             // log: Step complete
-            setConsoleLog(prev=>[`✅ Execution complete for Step ${i+1}`,...prev])
+            setConsoleLog(prev => [`✅ Execution complete for Step ${i + 1}`, ...prev])
         }
 
-        setConsoleLog(prev=>[`🎯 All Steps Executed Successfully.`,...prev])
+        setConsoleLog(prev => [`🎯 All Steps Executed Successfully.`, ...prev])
     }
 
     const camUrl = import.meta.env.VITE_CAM_LINK
