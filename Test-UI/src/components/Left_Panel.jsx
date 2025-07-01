@@ -7,9 +7,17 @@ function Left_Panel() {
     const { mappedSteps, query, count, steps } = useCaseContext()
     const { active, setActive } = useCaseContext()
 
+
     return (
         <>
-
+            <style>
+                {`
+  @keyframes anime {
+    0%   { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+  }
+`}
+            </style>
             <div className="p-3 border-end mt-3" style={{ height: '100%', overflowY: 'auto' }}>
                 <div>
                     <div className='d-flex justify-content-between'>
@@ -21,7 +29,8 @@ function Left_Panel() {
                     <div className='d-flex flex-column'>
                         <p className='text-muted my-3 mx-2' style={{ textAlign: 'justify' }}><small><em>This automation workflow will authenticate with the system, fetch user data, process it according to your criteria, send notifications to active users, and generate a comprehensive report of the entire process.</em></small></p>
 
-                        <p className='text-secondary text-center'>User-Query : <span className='text-primary'>{query}</span> </p>
+                        <input type="text" placeholder={`${query}`} name="" id="" readOnly className='form-control  my-3 text-center' style={{ border: '0.5px solid transparent', borderRadius: '8px', padding: '1px 1px', backgroundImage: 'linear-gradient(white, white), linear-gradient(-45deg,rgb(108, 110, 233),rgba(100, 93, 227, 0.75),rgb(0, 140, 255),rgb(0, 183, 255))', backgroundOrigin: 'border-box', backgroundClip: 'content-box, border-box', animation: 'anime 2s linear infinite alternate', backgroundSize: '200% 200%' }} />
+                        {/* <p className='text-secondary text-center'>User-Query : <span className='text-primary'>{query}</span> <  /p> */}
                     </div>
                     <ol>
                         {mappedSteps.length ? mappedSteps.map((mStep, index) => (

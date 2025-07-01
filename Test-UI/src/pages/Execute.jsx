@@ -22,7 +22,9 @@ function Execute() {
     const [query, setQuery] = useState('');
     const [count, setCount] = useState(0);
     const [consoleLog, setConsoleLog] = useState([])
-    const [active,setActive]=useState(null)
+    const [active, setActive] = useState(null)
+    const [executeSteps, setExecuteSteps] = useState([])
+    const [activeStepIndex, setActiveStepIndex] = useState(null)
 
 
 
@@ -64,7 +66,7 @@ function Execute() {
             </Navbar>
 
 
-            <CaseContext.Provider value={{ steps, query, count, mappedSteps, consoleLog, setConsoleLog,active,setActive }}>
+            <CaseContext.Provider value={{ steps, query, count, mappedSteps, consoleLog, setConsoleLog, active, setActive, executeSteps, setExecuteSteps, activeStepIndex, setActiveStepIndex }}>
                 <div style={{ height: '100vh' }} className='mt-5'>
                     <SplitPane split="vertical" defaultSize="25%" minSize={200} style={{ zIndex: '0' }}>
                         {/* Left Panel: Generated Steps */}
