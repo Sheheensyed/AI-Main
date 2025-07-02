@@ -4,8 +4,8 @@ function Right_Panel() {
     return (
         <>
 
-            <div className="p-3 text-center" style={{ height: '100%', overflowY: 'auto' }}>
-                <h5 className="mb-4">Robot Framework</h5>
+            <div className="p-3 text-center mt-3" style={{ height: '65%', overflowY: 'auto' }}>
+                <h5 className="mt-3">Robot Framework</h5>
 
                 <p className='text-dark'>The generated script will appear here after the workflow is executed.</p>
                 {/* Future content */}

@@ -15,6 +15,7 @@ function Search() {
     const [error, setError] = useState(false)
     const { steps, setSteps } = useStepContext();
     const [loading, setLoading] = useState(false)
+    const [mapping, setMapping] = useState(false)
     const [editSteps, setEditSteps] = useState('')
     const [caseId, setCaseId] = useState('');
     const { setMappedSteps } = useMappedSteps();
@@ -59,6 +60,7 @@ function Search() {
 
     const handleSubmit = async () => {
         setLoading(true)
+        setMapping(true)
         setShowSteps(false)
         const add = {
             device: device,
@@ -88,6 +90,7 @@ function Search() {
         }
         finally {
             setLoading(false)
+            setMapping(false)
         }
     }
 
@@ -123,6 +126,7 @@ function Search() {
 
     const handleExecute = async () => {
         try {
+            setMapping(true)
             const id = caseId || localStorage.getItem("caseId");
             const cleanedSteps = steps.filter(step => step.trim() !== "");
             const response = await mapSteps(id, cleanedSteps);
@@ -136,6 +140,9 @@ function Search() {
             }
         } catch (error) {
             console.log(error);
+        } finally {
+            setMapping(false)
+
         }
     };
 
@@ -147,41 +154,47 @@ function Search() {
     return (
         <>
             <div className='d-flex vh-100 w-100 justify-content-center align-items-center flex-column'>
+                {!loading && !steps.length && (
 
-                <div className='border border-1 m-0 p-3 w-50 rounded-2' >
-                    <h3 className='text-center fw-bold'>Device Configuration</h3>
+                    <>
 
-                    <h5 className='mt-4'>Select Device Under Test (DUT) <span className='text-danger'>*</span> </h5>
+                        <div className='border border-1 m-0 p-1 w-50 rounded-4 h-25 shadow-sm' style={{ border: '0.5px solid transparent', backgroundImage: 'linear-gradient(white, white), linear-gradient(-45deg,rgb(108, 110, 233),rgba(100, 93, 227, 0.75),rgb(0, 140, 255),rgb(0, 183, 255))', backgroundClip: 'content-box, border-box' }}>
+                            <h3 className='text-center fw-bold mt-2' style={{ background: 'linear-gradient(-25deg,rgb(108, 110, 233),rgba(100, 93, 227, 0.75),rgb(0, 140, 255),rgb(0, 183, 255))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Device Configuration</h3>
 
-                    <select className={`form-select ${error ? 'border border-danger border-2' : device ? 'border border-primary border-1' : ''}`} value={device} onChange={(e) => { setDevice(e.target.value); setError(false) }} style={{
-                        width: "100%", padding: "8px", borderRadius: "5px", border: "1px solid #ccc", appearance: "none", // removes default arrow in some browsers
-                    }}>
-                        <option value="" hidden>
-                            Choose a DUT Type
-                        </option>
-                        <option value="IPhone">Iphone</option>
-                        <option value="Nothing">Nothing</option>
-                        <option value="Moto">Moto</option>
-                        <option value="Samsung">Samsung</option>
-                    </select>
+                            <h5 className='mt-4 text-center'>Select Device Under Test (DUT) <span className='text-danger'>*</span> </h5>
+
+                            <select className={`form-select ${error ? 'border border-danger border-2' : device ? 'border border-primary border-1' : ''}, my-3 w-75 text-center m-auto`} value={device} onChange={(e) => { setDevice(e.target.value); setError(false) }} style={{
+                                width: "100%", padding: "8px", borderRadius: "5px", border: "1px solid #ccc", appearance: "none", // removes default arrow in some browsers
+                            }}>
+                                <option value="" disabled>
+                                    Choose a DUT Type
+                                </option>
+                                <option value="IPhone">Iphone</option>
+                                <option value="Nothing">Nothing</option>
+                                <option value="Moto">Moto</option>
+                                <option value="Samsung">Samsung</option>
+                            </select>
 
 
-                </div>
+                        </div>
 
-                <form className='w-50 text-center my-3' onSubmit={(e) => { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } }}>
-                    <textarea type="text" name="" placeholder='Enter Input' className='form-control' onChange={(e) => setUserQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } } }} />
-                    <button className={`btn ${(!userQuery || !device) ? 'btn-secondary' : 'btn-success'}  mx-3 my-3 px-5 gap-2 `} disabled={!userQuery || !device || loading}>Generate</button>
-                </form>
+                        <form className='w-50 text-center my-3' onSubmit={(e) => { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } }}>
+                            <textarea type="text" name="" rows={3} placeholder='Enter Input' className='form-control border border-black rounded-3 shadow-sm' onChange={(e) => setUserQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } } }} />
+                            <button className={`btn ${(!userQuery || !device) ? 'btn-secondary' : 'btn-success'}  mx-3 my-3 px-5 `} disabled={!userQuery || !device || loading}>Generate</button>
+                        </form>
 
-                {loading ? (
+                    </>
+                )
+                }
+                {(loading || mapping) ? (
                     <div className="d-flex justify-content-center align-items-center mt-4">
                         <div className="spinner-border text-primary" role="status">
                             <span className="visually-hidden">Loading...</span>
                         </div>
-                        <span className="ms-2 text-primary">Generating steps...</span>
+                        <span className="ms-2 text-primary">{loading ? 'Generating steps...' : "Mapping Steps"}</span>
                     </div>
                 ) : steps?.length > 0 ? (
-                    <div className='border border-2 w-75 p-3'>
+                    <div className='border border-2 w-75 p-3 shadow-lg rounded-4'>
                         <h5 className='text-center'>Steps to Generate The Automation</h5>
 
                         <ol>
@@ -196,7 +209,7 @@ function Search() {
                         </div>
                     </div>
                 ) : null}
-                
+
 
                 {/* Edit */}
                 <Modal show={show} onHide={handleClose}>

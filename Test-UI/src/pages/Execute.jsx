@@ -1,12 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getSingleCase } from '../services/allApi';
 import { useParams } from 'react-router-dom';
-import Badge from 'react-bootstrap/Badge';
-import Button from 'react-bootstrap/Button';
 import SplitPane from 'react-split-pane';
 import '../styles/split-pane.css';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowsUpDownLeftRight, faCamera, faCrosshairs, faHand, faLightbulb, faMobile, faMobileScreenButton } from '@fortawesome/free-solid-svg-icons';
 import Container from 'react-bootstrap/Container';
 import Navbar from 'react-bootstrap/Navbar';
 import logo from '../assets/logo-3.png.webp'
@@ -67,7 +63,7 @@ function Execute() {
 
 
             <CaseContext.Provider value={{ steps, query, count, mappedSteps, consoleLog, setConsoleLog, active, setActive, executeSteps, setExecuteSteps, activeStepIndex, setActiveStepIndex }}>
-                <div style={{ height: '100vh' }} className='mt-5'>
+                <div style={{ height: '100vh' }} className='mt-5' onContextMenu={(e) => e.preventDefault()}>
                     <SplitPane split="vertical" defaultSize="25%" minSize={200} style={{ zIndex: '0' }}>
                         {/* Left Panel: Generated Steps */}
                         <Left_Panel />

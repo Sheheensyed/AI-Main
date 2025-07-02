@@ -40,11 +40,11 @@ function Live_Cam() {
     const camUrl = import.meta.env.VITE_CAM_LINK
     return (
         <>
-            <div className="p-3 text-center bg-warning" style={{ height: '65%', overflow: 'auto' }}>
+            <div className="p-3 text-center mt-3" style={{ height: '65%', overflow: 'auto' }}>
 
                 <div className='d-flex justify-content-center align-items-center mb-3'>
 
-                    <button className='btn btn-dark px-4' onClick={ExecuteStepOneByOne}>Execute</button>
+                    <button className='btn btn-dark px-4 shadow' onClick={ExecuteStepOneByOne}>Execute</button>
                     <button className='btn btn-warning ms-2 px-3'>Pause</button>
                     <button className='btn btn-success px-3'>Play</button>
 
