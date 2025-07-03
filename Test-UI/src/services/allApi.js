@@ -3,7 +3,6 @@ import { serverUrl, serverUrlFastApi } from './serverURL';
 
 
 // Node Backend
-
 export const addCase = (body) => {
   return commonApi('POST', `${serverUrl}/generate-steps`, body);
 };
@@ -32,7 +31,6 @@ export const getCaseById = (caseId) => {
   return commonApi('GET', `${serverUrl}/case/${caseId}`)
 }
 
-
 export const getSingleCase = (id) => {
   return commonApi("GET", `${serverUrl}/cases/${id}`);
 };
@@ -40,7 +38,6 @@ export const getSingleCase = (id) => {
 
 
 // FastApi Backend
-
 export const mapSteps = (caseId, steps) => {
   const body = {
     case_id: caseId,
