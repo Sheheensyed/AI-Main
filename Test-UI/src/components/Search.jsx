@@ -154,7 +154,8 @@ function Search() {
     return (
         <>
             <div className='d-flex vh-100 w-100 justify-content-center align-items-center flex-column'>
-                {!loading && !steps.length && (
+                {!loading && (
+                // {!loading && !steps.length && (
 
                     <>
 
@@ -184,8 +185,8 @@ function Search() {
                         </form>
 
                     </>
-                )
-                }
+                )}
+                {/* )} */}
                 {(loading || mapping) ? (
                     <div className="d-flex justify-content-center align-items-center mt-4">
                         <div className="spinner-border text-primary" role="status">

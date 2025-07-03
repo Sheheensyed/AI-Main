@@ -20,18 +20,24 @@ function Live_Cam() {
         for (let i = 0; i < mappedSteps.length; i++) {
             const step = mappedSteps[i];
 
-            // Update Accordian Steps
-            setExecuteSteps(prev => [...prev, step])
             setActiveStepIndex(i);
-
-            // Log : Step executing
             setConsoleLog(prev => [`⚙️ Step ${i + 1} Executing : ${step.step}`, ...prev])
 
-            //Step execution (delay 2sec)
-            await new Promise(res => setTimeout(res, 2000))
+            try {
+                const result = await captureScreen({ step: step.step })
+                console.log(`Capture screen result:`, result.data);
 
-            // log: Step complete
-            setConsoleLog(prev => [`✅ Execution complete for Step ${i + 1}`, ...prev])
+                const imageUrl = result.data.image
+
+                const stepWithImage = { ...step, image: imageUrl }
+                setExecuteSteps(prev => [...prev, imageUrl])
+
+                setConsoleLog(prev => [`✅ Execution complete for Step ${i + 1}`, ...prev]);
+            } catch (error) {
+                console.log(`Api Error:`, error);
+                setConsoleLog(prev => [`❌ Failed to capture screen for Step ${i + 1}`, ...prev])
+
+            }
         }
 
         setConsoleLog(prev => [`🎯 All Steps Executed Successfully.`, ...prev])
@@ -59,9 +65,10 @@ function Live_Cam() {
                     {executeSteps.map((item, index) => (
                         <Accordion.Item eventKey={(index + 1).toString()} >
                             <Accordion.Header key={index} > Step {index + 1} {activeStepIndex === index && '*'} {item.step}</Accordion.Header>
-                            <Accordion.Body className='bg-light' style={{ textAlign: 'justify' }}>
+                            <Accordion.Body className='bg-light d-flex justify-content-center' style={{ textAlign: 'justify' }} >
                                 {/* style={{ backgroundColor: activeStepIndex === index ? "#f0ad4e" : "inherit", color: activeStepIndex === index ? '#000' : 'inherit', textAlign: 'justify' }} */}
-                                {item.parameter}
+                                {/* {item.parameter} */}
+                                <img src="https://purepng.com/public/uploads/large/purepng.com-mariomariofictional-charactervideo-gamefranchisenintendodesigner-1701528634653vywuz.png" width={200} height={200} alt="" />
                                 {/* {console.log("Image data for step", index, ":", item.image)}
                                 {item.image ? <img src={`data:image/jpeg;base64,${item.image}`} alt="step image" style={{ maxWidth: '100%', height: 'auto' }}
                                 /> :
