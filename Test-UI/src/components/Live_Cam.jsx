@@ -83,38 +83,7 @@ function Live_Cam() {
   };
   return (
     <>
-      <div className="p-3 text-center mt-3" style={{ height: '65%', overflow: 'auto' }}>
-
-        <div className='d-flex justify-content-center align-items-center mb-3'>
-
-          <button className='btn btn-dark px-4 shadow' onClick={ExecuteStepOneByOne}>Execute</button>
-          <button className='btn btn-warning ms-2 px-3'>Pause</button>
-          <button className='btn btn-success px-3'>Play</button>
-
-          <h5 className="mb-0 text-center flex-grow-1">Live Cam</h5>
-          <div style={{ width: '20%' }}></div>
-        </div>
-        <div className=" w-100 h-100 rounded" style={{ height: '100%', width: '100%', borderRadius: '8px' }}>
-          <img src={camUrl} alt="Live-Cam" style={{ height: '100%', width: '100%' }} />
-        </div>
-
-        <Accordion className='my-3'>
-          {executeSteps.map((item, index) => (
-            <Accordion.Item eventKey={(index + 1).toString()} >
-              <Accordion.Header key={index} > Step {index + 1} {activeStepIndex === index && '*'} {item.step}</Accordion.Header>
-              <Accordion.Body className='bg-light' style={{ textAlign: 'justify' }}>
-                {/* {item.parameter} */}
-                {capturedImage ?
-                  <img src={`data:image/jpeg;base64,${capturedImage}`} alt="step image" style={{ maxWidth: '100%', height: 'auto' }}
-                  /> :
-                  <p>No image Available</p>}
-              </Accordion.Body>
-            </Accordion.Item>
-          ))}
-        </Accordion>
-
-      </div>
-
+      
     </>
   )
 }
