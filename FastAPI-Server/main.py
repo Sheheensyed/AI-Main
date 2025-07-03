@@ -12,6 +12,7 @@ import json
 from fastapi.responses import JSONResponse
 from datetime import datetime
 from fastapi.staticfiles import StaticFiles 
+import base64
 
 # Load environment variables
 load_dotenv()
@@ -26,6 +27,7 @@ client = MongoClient(mongo_url, tls=True, tlsAllowInvalidCertificates=True)
 db = client["TestAutomation"]
 cases_collection = db["cases"]
 templates_collection = db["templates"]
+images_collection = db["images"]  # NEW collection for images
 
 # Fixed template ID (replace this with your actual template ObjectId)
 TEMPLATE_OBJECT_ID = ObjectId("685d43b799df0ca9b740bc1f")
@@ -51,7 +53,9 @@ class MappingRequest(BaseModel):
 
 # Capture request model
 class CaptureRequest(BaseModel):
+    base64_image: str
     step: str
+    case_id: str
 
 @app.post("/generate-mapped-steps")
 def generate_mapped_steps(data: MappingRequest):
@@ -149,15 +153,56 @@ def generate_mapped_steps(data: MappingRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/captureImage")
-async def capture_screen(request:CaptureRequest):
-    step_name=request.step
+@app.post("/capture_screen")
+async def capture_screen(data: CaptureRequest):
+    try:
+        base64_image = data.base64_image
 
-    image_filename=f"{step_name}={datetime.now().strftime('%Y%m%d%H%m%S')}.png"
-    image_path=os.path.join(IMAGES_DIR,image_filename)
+        # Decode base64
+        image_data = base64.b64decode(base64_image)
 
-    with open(image_path,"wb") as f:
-        f.write(b"") # Fake placeholder
-    
-    image_url=f"http://localhost:8000/images/{image_filename}"
-    return JSONResponse(content={"image":image_url})
+        # Save to file
+        filename = f"{data.step}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        image_path = os.path.join(IMAGES_DIR, filename)
+        with open(image_path, "wb") as f:
+            f.write(image_data)
+
+        # Save metadata + base64 in MongoDB
+        images_collection.insert_one({
+            "case_id": ObjectId(data.case_id),
+            "step": data.step,
+            "filename": filename,
+            "base64_image": base64_image,
+            "created_at": datetime.utcnow()
+        })
+
+        # Return image URL
+        image_url = f"http://localhost:8000/images/{filename}"
+        return JSONResponse(content={"image_url": image_url})
+
+    except Exception as e:
+        print("Error saving image:", e)
+        raise HTTPException(status_code=500, detail=str(e))
+    try:
+        # Save base64 to DB
+        captured_doc = {
+            "case_id": request.case_id,
+            "step": request.step,
+            "base64_image": request.base64_image,
+        }
+        captured_images_collection.insert_one(captured_doc)
+
+        # Decode and save image to file system
+        img_data = base64.b64decode(request.base64_image)
+        image_filename = f"{request.step}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+        image_path = os.path.join(IMAGES_DIR, image_filename)
+
+        with open(image_path, "wb") as f:
+            f.write(img_data)
+
+        image_url = f"http://localhost:8000/images/{image_filename}"
+
+        return JSONResponse(content={"image_url": image_url})
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
