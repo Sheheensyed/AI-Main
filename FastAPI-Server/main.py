@@ -42,7 +42,7 @@ app.add_middleware(
 
 IMAGES_DIR="images"
 os.makedirs(IMAGES_DIR,exist_ok=True)
-app.mount("images",StaticFiles(directory=IMAGES_DIR),name="images")
+app.mount("/images",StaticFiles(directory=IMAGES_DIR),name="images")
 
 # Request model
 class MappingRequest(BaseModel):
@@ -149,7 +149,7 @@ def generate_mapped_steps(data: MappingRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("capture_screen")
+@app.post("/captureImage")
 async def capture_screen(request:CaptureRequest):
     step_name=request.step
 

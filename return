@@ -1,0 +1,77 @@
+[33mcommit f0eaad793b75914028176d97987d14ce5787421e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmaster[m[33m, [m[1;31morigin/master[m[33m)[m
+Author: syed sheheen <you@example.com>
+Date:   Thu Jul 3 12:15:17 2025 +0530
+
+    Added capture-image fastApi
+
+[33mcommit d4073e25d06999ad45d4c9c8a8f0ff64915e0c0f[m
+Author: syed sheheen <you@example.com>
+Date:   Wed Jul 2 15:35:14 2025 +0530
+
+    UI Enhancement in Both pages
+
+[33mcommit 83793ffd64f7cd2bbf23cd6fb0562ae2573e7461[m
+Author: syed sheheen <you@example.com>
+Date:   Tue Jul 1 17:58:20 2025 +0530
+
+    Updated UI
+
+[33mcommit e66a9f6769b26026c269ed9bab09af64fc56e5d3[m
+Author: syed sheheen <you@example.com>
+Date:   Mon Jun 30 17:44:47 2025 +0530
+
+    d
+
+[33mcommit 987f1be5890972d037114b64d9dd57d7cd1f7ec2[m
+Author: syed sheheen <you@example.com>
+Date:   Fri Jun 27 15:52:02 2025 +0530
+
+    Established Executing and logging console
+
+[33mcommit 050779a7174b34ae62d1c1baa60f7907b40dfba7[m
+Author: syed sheheen <you@example.com>
+Date:   Fri Jun 27 11:36:43 2025 +0530
+
+    Live Cam Added
+
+[33mcommit f805c23a71871600a6deb86c1e9cc7e82a85f2b7[m
+Author: syed sheheen <you@example.com>
+Date:   Thu Jun 26 18:38:11 2025 +0530
+
+    fastApi updated
+
+[33mcommit c81767ee0f62d1c1c1fac513f9345916ef4b0f5e[m
+Author: syed sheheen <you@example.com>
+Date:   Thu Jun 26 18:36:59 2025 +0530
+
+    Completed AI Template
+
+[33mcommit 99ac98c6e1fc40218e9230f0d3e92dbb79074ff9[m
+Author: syed sheheen <you@example.com>
+Date:   Thu Jun 26 00:15:47 2025 +0530
+
+    Updated
+
+[33mcommit 892fe4ea91df320672b4ec34a417069222cb6dfd[m
+Author: syed sheheen <you@example.com>
+Date:   Wed Jun 25 17:01:45 2025 +0530
+
+    Updated Execute page
+
+[33mcommit 6bcd39ea7326f7322a1e0a25d2482babed6834fb[m
+Author: syed sheheen <you@example.com>
+Date:   Wed Jun 25 09:36:16 2025 +0530
+
+    Removed list and added Execute.jsx which represents List.jsx
+
+[33mcommit 4f839d29bc156d46d8317f2b16924c453956ca07[m
+Author: syed sheheen <you@example.com>
+Date:   Tue Jun 24 14:34:10 2025 +0530
+
+    Added list.jsx code to Search.jsx
+
+[33mcommit 905cd0b1193874cf62d4181989e603f9a64af7c0[m
+Author: syed sheheen <you@example.com>
+Date:   Tue Jun 24 10:06:30 2025 +0530
+
+    Initial commit with UI, Node Server and fastApi
