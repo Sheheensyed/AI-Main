@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { getSingleCase } from '../services/allApi';
-import { useParams } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import SplitPane from 'react-split-pane';
 import '../styles/split-pane.css';
 import Container from 'react-bootstrap/Container';
@@ -55,7 +55,7 @@ function Execute() {
                         </div>
 
                         <div>
-                            <button className='btn btn-outline-primary'>Home</button>
+                            <Link to={'/'}><button className='btn btn-outline-primary'>Home</button></Link>
                         </div>
                     </Navbar.Brand>
                 </Container>

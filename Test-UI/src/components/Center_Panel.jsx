@@ -113,17 +113,17 @@ function Center_Panel() {
           <h5 className="mb-0 text-center flex-grow-1">Live Cam</h5>
           <div style={{ width: '20%' }}></div>
         </div>
-        <div className="w-100 h-100 rounded">
-          <img src={camUrl} alt="Live-Cam" style={{ height: '100%', width: '100%' }} />
+        <div className="w-100 h-100">
+          <img src={camUrl} alt="Live-Cam" className='rounded-4' style={{ height: '100%', width: '100%' }} />
         </div>
 
         <Accordion className='my-3'>
           {executeSteps.map((item, index) => (
-            <Accordion.Item key={index} eventKey={(index + 1).toString()}>
+            <Accordion.Item className='' key={index} eventKey={(index + 1).toString()} >
               <Accordion.Header>Step {index + 1} {activeStepIndex === index && '*'} {item.step}</Accordion.Header>
-              <Accordion.Body className='bg-light' style={{ textAlign: 'justify' }}>
+              <Accordion.Body className='bg-danger-subtle' style={{ textAlign: 'justify' }}>
                 {capturedImage ?
-                  <img src={`data:image/jpeg;base64,${capturedImage}`} alt="step image" style={{ maxWidth: '100%', height: 'auto' }} />
+                  <img src={capturedImage} alt="step image" style={{ maxWidth: '100%', height: 'auto' }} />
                   :
                   <p>No image Available</p>}
               </Accordion.Body>

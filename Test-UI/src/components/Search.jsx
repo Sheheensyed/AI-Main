@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react'
+import React, { useContext, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom';
 import DeviceContext from '../context/Temp';
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
@@ -21,6 +21,7 @@ function Search() {
     const { setMappedSteps } = useMappedSteps();
     const [show, setShow] = useState(false);
     const [showSteps, setShowSteps] = useState(false);
+    const textareaRef = useRef(null)
 
 
     const handleSaveChanges = async () => {
@@ -94,6 +95,14 @@ function Search() {
         }
     }
 
+    const handleDeviceChange = (e) => {
+        setDevice(e.target.value);
+        if (textareaRef.current) {
+            textareaRef.current.focus();
+        }
+    };
+
+
     const handleStepChange = (index, newValue) => {
         const updateSteps = [...editSteps]
         updateSteps[index] = newValue;
@@ -124,6 +133,19 @@ function Search() {
         }
     };
 
+    const handleReset = () => {
+        setDevice('');
+        setModel('');
+        setUserQuery('');
+        setSteps([]);
+        setCaseId('');
+        setShowSteps(false);
+        setError(false);
+        setMappedSteps([]);
+        localStorage.removeItem('caseId');
+    };
+
+
     const handleExecute = async () => {
         try {
             setMapping(true)
@@ -151,11 +173,30 @@ function Search() {
         setError(false)
         // localStorage.removeItem('caseId')
     }, []);
+
+    // useEffect(() => {
+    //     const id = localStorage.getItem('caseId');
+    //     if (id) {
+    //         (async () => {
+    //             try {
+    //                 const response = await getSingleCase(id);
+    //                 console.log("Fetched case on refresh:", response);
+    //                 if (response) {
+    //                     setSteps(response.steps || []);
+    //                     setCaseId(response._id);
+    //                 }
+    //             } catch (error) {
+    //                 console.log("Error fetching case on refresh:", error);
+    //             }
+    //         })();
+    //     }
+    // }, []);
+
     return (
         <>
             <div className='d-flex vh-100 w-100 justify-content-center align-items-center flex-column'>
                 {!loading && (
-                // {!loading && !steps.length && (
+                    // {!loading && !steps.length && (
 
                     <>
 
@@ -164,7 +205,7 @@ function Search() {
 
                             <h5 className='mt-4 text-center'>Select Device Under Test (DUT) <span className='text-danger'>*</span> </h5>
 
-                            <select className={`form-select ${error ? 'border border-danger border-2' : device ? 'border border-primary border-1' : ''}, my-3 w-75 text-center m-auto`} value={device} onChange={(e) => { setDevice(e.target.value); setError(false) }} style={{
+                            <select className={`form-select ${error ? 'border border-danger border-2' : device ? 'border border-primary border-1' : ''}, my-3 w-75 text-center m-auto`} value={device} onChange={handleDeviceChange} style={{
                                 width: "100%", padding: "8px", borderRadius: "5px", border: "1px solid #ccc", appearance: "none", // removes default arrow in some browsers
                             }}>
                                 <option value="" disabled>
@@ -180,8 +221,9 @@ function Search() {
                         </div>
 
                         <form className='w-50 text-center my-3' onSubmit={(e) => { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } }}>
-                            <textarea type="text" name="" rows={3} placeholder='Enter Input' className='form-control border border-black rounded-3 shadow-sm' onChange={(e) => setUserQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } } }} />
+                            <textarea ref={textareaRef} type="text" value={userQuery} name="" rows={3} placeholder='Enter Input' className='form-control border border-black rounded-3 shadow-sm' onChange={(e) => setUserQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (device && userQuery.trim()) { handleSubmit() } } }} />
                             <button className={`btn ${(!userQuery || !device) ? 'btn-secondary' : 'btn-success'}  mx-3 my-3 px-5 `} disabled={!userQuery || !device || loading}>Generate</button>
+                            <button className={`btn ${steps.length > 0 ? 'btn-danger' : 'btn-secondary'} mx-3 my-3 px-5`} disabled={steps.length === 0} onClick={handleReset}>Reset</button>
                         </form>
 
                     </>
@@ -195,8 +237,8 @@ function Search() {
                         <span className="ms-2 text-primary">{loading ? 'Generating steps...' : "Mapping Steps"}</span>
                     </div>
                 ) : steps?.length > 0 ? (
-                    <div className='border border-2 w-75 p-3 shadow-lg rounded-4'>
-                        <h5 className='text-center'>Steps to Generate The Automation</h5>
+                    <div className=' w-50 shadow-lg rounded-4' style={{ padding:'4px',border: '0.5px solid transparent', backgroundImage: 'linear-gradient(white, white), linear-gradient(-45deg,rgb(108, 110, 233),rgba(100, 93, 227, 0.75),rgb(0, 140, 255),rgb(0, 183, 255))', backgroundClip: 'content-box, border-box' }}>
+                        <h5 className='text-center my-2'>Steps to Generate The Automation</h5>
 
                         <ol>
                             {steps.map((item, index) => (
@@ -204,7 +246,7 @@ function Search() {
                             ))}
                         </ol>
 
-                        <div className='d-flex justify-content-center align-items-center'>
+                        <div className='d-flex justify-content-center align-items-center my-2'>
                             <button className='btn btn-warning' onClick={handleShow}>Edit</button>
                             <button className='btn btn-success mx-3' onClick={handleExecute}>Build</button>
                         </div>
