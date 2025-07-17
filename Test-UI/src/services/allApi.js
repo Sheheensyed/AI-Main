@@ -8,14 +8,18 @@ export const addCase = (body) => {
 };
 
 export const editSingleSteps = (caseId, stepIndex, updateStep) => {
+   console.log("➡️ editSingleSteps() called with:", { caseId, stepIndex, updateStep });
   return commonApi('PUT', `${serverUrl}/case/${caseId}/step/${stepIndex}`, { newStep: updateStep })
 }
 
 export const deleteSingleSteps = (id, stepIndex) => {
+  console.log("➡️ deleteSingleSteps() Deleted with:", { id, stepIndex });
+  
   return commonApi('DELETE', `${serverUrl}/case/${id}/step/${stepIndex}`)
 }
 
 export const addNewStep = (caseId, newStepObj) => {
+   console.log("⬆️ Sending step to case ID:", caseId); // add this
   return commonApi('POST', `${serverUrl}/case/${caseId}/step`, newStepObj);
 };
 
@@ -47,7 +51,7 @@ export const mapSteps = (caseId, steps) => {
 }
 
 export const captureScreen = (body) => {
-  return commonApi('POST', `${serverUrlFastApi}/capture_screen`, body)
+  return commonApi('POST', `${serverUrlFastApi}/execute_with_gemini`, body)
 }
 
 export const fallbackProcessStep = (step) => {

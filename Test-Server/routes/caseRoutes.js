@@ -6,7 +6,7 @@ const { executeMappingController } = require('../controller/executeMapping');
 
 router.post('/generate-steps', caseController.generateSteps);
 router.get('/cases/:id', caseController.getCase);
-router.put('/case/:id/step/:stepIndex', caseController.editStep);
+router.put('/case/:caseId/step/:stepIndex', caseController.editStep);
 router.delete('/case/:id/step/:stepIndex', caseController.deleteStep);
 router.post('/case/:id/step', caseController.addStep);
 

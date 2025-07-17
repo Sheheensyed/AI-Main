@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model Case {
+  id                Int      @id @default(autoincrement())
+  project_name      String
+  device            String
+  model             String
+  user_query        String
+  steps             Step[]
+  mapped_steps      MappedStep[]
+  createdAt         DateTime @default(now())
+  createdAtFormatted String?
+}
+
+model Step {
+  id      Int    @id @default(autoincrement())
+  content String
+  case    Case   @relation(fields: [caseId], references: [id])
+  caseId  Int
+}
+
+model MappedStep {
+  id        Int    @id @default(autoincrement())
+  step      String
+  api       String
+  parameter String
+  case      Case   @relation(fields: [caseId], references: [id])
+  caseId    Int
+}

@@ -1,20 +1,65 @@
 *{
   margin: 0px;
   padding: 0px;
-  font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif;
+  /* font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif; */
+  font-family: "Inter", sans-serif;
+  font-optical-sizing: auto;
+  font-weight: 400;
+  font-style:'';
 }
 
 .toolbar{
     border: 2px solid red;
     background-color: yellow;
     /* background-color: rgb(13, 0, 255); */
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  @keyframes fadeIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  
+  @keyframes anime {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+  
+  
+  @keyframes input {
+    0% {
+      background-position: 0% 50%;
+    }
+    100% {
+      background-position: 100% 50%;
+    }
+  }
+  
+  
+  /* For vertical split */
+  .Resizer.vertical {
+    width: 2px;  /* or 2px, or whatever you want */
+    background: #ccc; /* color of the line */
+    cursor: col-resize; /* keeps the drag cursor */
+  }
+  
+  /* For horizontal split (if needed)
+  .Resizer.horizontal {
+    height: 4px;
+    background: #ccc;
+    cursor: row-resize;
+    } */
+    
+    
+    .tooltip-inner {
+      font-size: 10px;   /* smaller text */
+      padding: 4px 8px;  /* less padding */
 }
