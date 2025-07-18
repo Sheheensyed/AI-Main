@@ -8,7 +8,10 @@ from dotenv import load_dotenv
 import os
 import requests
 import time
-from db import templates_collection,cases_collection
+# from db import templates_collection,cases_collection
+from models import  Case
+from db import SessionLocal
+
 
 # Load environment variables
 load_dotenv()

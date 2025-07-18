@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from fastapi.middleware.cors import CORSMiddleware
-from pymongo import MongoClient
+# from pymongo import MongoClient
 from bson import ObjectId
 from datetime import datetime
 import base64
@@ -14,9 +14,42 @@ import google.generativeai as genai
 from hapi_prompt import prompt_template
 from exe_prompt import prompt_template_exe
 from function import abort, swipe,capture_screen,tap,get_text  
-from db import templates_collection, cases_collection
+# from db import templates_collection, cases_collection
 from PIL import Image
 import io
+from sqlalchemy import create_engine
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker, declarative_base
+
+from fastapi import Depends
+from sqlalchemy.orm import Session
+from db import SessionLocal
+from models import Case
+from schemas import MappingRequest,StepCreate,StepEdit  # create this pydantic model
+
+from fastapi import FastAPI, Depends, HTTPException
+from sqlalchemy.orm import Session
+from models import Base, Case, Step,Template
+from db import engine, SessionLocal
+from schemas import CaseCreate, CaseOut,ProjectNameInput
+from datetime import datetime
+import requests
+import json
+
+from generate_steps import generated_steps
+
+import subprocess
+import json
+
+
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 
 # --- Load environment variables ---
@@ -24,16 +57,27 @@ load_dotenv()
 mongo_url = os.getenv("DATABASE")
 gemini_api_key = os.getenv("GEMINI_API_KEY")
 capture_url = os.getenv("CAPTURE_SCREEN_URL")
+DATABASE_URL = os.getenv("DATABASE_URL")
+ACTIVE_TEMPLATE_URL = os.getenv("ACTIVE_TEMPLATE_URL")
+print("🧪 Loaded URL:", ACTIVE_TEMPLATE_URL)
+
 
 # --- Configure Gemini ---
 genai.configure(api_key=gemini_api_key)
 
 # --- MongoDB setup ---
-client = MongoClient(mongo_url, tls=True, tlsAllowInvalidCertificates=True)
-db = client["TestAutomation"]
-cases_collection = db["cases"]
-templates_collection = db["templates"]
-images_collection = db["images"]
+# client = MongoClient(mongo_url, tls=True, tlsAllowInvalidCertificates=True)
+# db = client["TestAutomation"]
+# cases_collection = db["cases"]
+# templates_collection = db["templates"]
+# images_collection = db["images"]
+
+
+
+# SQL Alchemy
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
 # TEMPLATE_OBJECT_ID = ObjectId("685d43b799df0ca9b740bc1f")
 # TEMPLATE_OBJECT_ID = ObjectId("686e44b08215320aecea7422")
@@ -41,6 +85,7 @@ TEMPLATE_OBJECT_ID = ObjectId("686f4970eb331def8f8c6ae1")
 
 # --- FastAPI setup ---
 app = FastAPI()
+Base.metadata.create_all(bind=engine)
 
 app.add_middleware(
     CORSMiddleware,
@@ -224,29 +269,205 @@ def get_latest_base64_image(case_id: str, exclude_image_id: ObjectId) -> str:
     with open(image_path, "rb") as img_file:
         return base64.b64encode(img_file.read()).decode("utf-8")
 
+# @app.post("/generate-steps", response_model=CaseOut)
+# def generate_steps(payload: CaseCreate, db: Session = Depends(get_db)):
+#     try:
+#         # Step 1: Create case
+#         new_case = Case(
+#             project_name=payload.project_name,
+#             device=payload.device,
+#             model=payload.model,
+#             user_query=payload.user_query,
+#             createdAtFormatted=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+#         )
+#         db.add(new_case)
+#         db.commit()
+#         db.refresh(new_case)
+
+#         # Step 2: Run Python Script
+#         result = run_python_script(str(new_case.id), payload.device, payload.model)
+
+#         # Step 3: Store Steps
+#         for s in result["steps"]:
+#             step = Step(content=s, caseId=new_case.id)
+#             db.add(step)
+#         db.commit()
+
+#         # Step 4: Return Case with Steps
+#         steps = db.query(Step).filter(Step.caseId == new_case.id).all()
+#         return {
+#             **new_case.__dict__,
+#             "steps": [s.content for s in steps]
+#         }
+
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/generate-steps", response_model=CaseOut) # Generating steps
+def generate_steps_route(payload: CaseCreate, db: Session = Depends(get_db)):
+    try:
+        # Step 1: Save Case
+        new_case = Case(
+            project_name=payload.project_name,
+            device=payload.device,
+            model=payload.model,
+            user_query=payload.user_query,
+            template_id=payload.template_id,  # ✅ Store it in DB
+            createdAtFormatted=datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        )
+        db.add(new_case)
+        db.commit()
+        db.refresh(new_case)
+
+        # Step 2: Generate steps using Gemini logic
+        result = generated_steps(payload.device, payload.user_query)
+
+        # Step 3: Save steps to DB
+        for s in result["steps"]:
+            db.add(Step(content=s, caseId=new_case.id))
+        db.commit()
+
+        # Step 4: Query updated case with its steps
+        db.refresh(new_case)
+        return new_case  # This returns CaseOut with steps as List[StepOut]
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/case/{id}/step", response_model=CaseOut) # Adding Steps by caseId
+def add_step(id: int, step_data: StepCreate, db: Session = Depends(get_db)):
+    case = db.query(Case).filter(Case.id == id).first()
+
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    new_step = Step(content=step_data.content, caseId=case.id)
+    db.add(new_step)
+    db.commit()
+    db.refresh(case)
+
+    return case
+
+@app.put("/case/{case_id}/step/{step_index}") # editing steps by caseId
+def edit_step(case_id: int, step_index: int, payload: StepEdit, db: Session = Depends(get_db)):
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    steps = db.query(Step).filter(Step.caseId == case_id).order_by(Step.id.asc()).all()
+    if step_index < 0 or step_index >= len(steps):
+        raise HTTPException(status_code=404, detail="Step index out of range")
+
+    step_to_update = steps[step_index]
+    step_to_update.content = payload.newStep
+    db.commit()
+
+    # Fetch updated steps
+    updated_steps = db.query(Step).filter(Step.caseId == case_id).order_by(Step.id.asc()).all()
+
+    return {
+        "message": "Step updated successfully",
+        "steps": [{"id": s.id, "content": s.content} for s in updated_steps]
+    }
+
+@app.delete("/case/{case_id}/step/{step_index}")
+def delete_step(case_id: int, step_index: int, db: Session = Depends(get_db)):
+    try:
+        # 🔍 Get all steps for the case ordered by ID
+        steps = db.query(Step).filter(Step.caseId == case_id).order_by(Step.id.asc()).all()
+
+        if step_index < 0 or step_index >= len(steps):
+            raise HTTPException(status_code=404, detail="Step index out of range")
+
+        # 🗑️ Get step to delete
+        step_to_delete = steps[step_index]
+        db.delete(step_to_delete)
+        db.commit()
+
+        # ✅ Get updated steps
+        updated_steps = db.query(Step).filter(Step.caseId == case_id).order_by(Step.id.asc()).all()
+        step_contents = [step.content for step in updated_steps]
+
+        return {
+            "message": "Step deleted successfully",
+            "steps": step_contents
+        }
+
+    except Exception as e:
+        print("❌ Error deleting step:", e)
+        raise HTTPException(status_code=500, detail="Step deletion failed")
+
+@app.post("/active_template") # With project name
+def create_template_from_active(project: ProjectNameInput, db: Session = Depends(get_db)):
+    try:
+        if not ACTIVE_TEMPLATE_URL:
+            raise HTTPException(status_code=500, detail="ACTIVE_TEMPLATE_URL is not set")
+
+
+        # Step 1: Fetch the active template JSON from external URL
+        response = requests.get(ACTIVE_TEMPLATE_URL)
+        if response.status_code != 200:
+            raise HTTPException(status_code=500, detail="Failed to fetch active template")
+        
+        template_json = response.json()
+
+        # Step 2: Extract fields (customize based on your actual structure)
+        template_name = template_json.get("name", "Unnamed Template")
+
+        print("🧪 Inserting into:", Template.__tablename__)
+
+        # Step 3: Insert into DB
+        new_template = Template(
+            projectName=project.projectName,
+            content=json.dumps(template_json)  # Will be saved as JSON
+        )
+
+        db.add(new_template)
+        db.commit()
+        db.refresh(new_template)
+
+        return {
+            "message": "Template saved successfully",
+            "id": new_template.id,
+            "projectName": project.projectName,
+            "templateName": template_name,
+        }
+
+    except Exception as e:
+        print("Error:", e)
+        raise HTTPException(status_code=500, detail="Server error during template save")
+
+
+
+
+
+
 @app.post("/generate-mapped-steps")
 def generate_mapped_steps(data: MappingRequest):
+    db: Session = SessionLocal()
     try:
         print(f"📥 Received steps for case_id: {data.case_id}")
 
-        case = cases_collection.find_one({"_id": ObjectId(data.case_id)})
+        # Fetch case from MySQL
+        case = db.query(Case).filter(Case.id == int(data.case_id)).first()
         if not case:
             raise HTTPException(status_code=404, detail="Case not found")
 
-        device = case.get("device")
+        device = case.device
         if not device:
             raise HTTPException(status_code=400, detail="Device not in case")
 
-        # ✅ Always use the latest steps directly from DB:
-        steps_text = "\n".join(case.get("steps", []))
+        # Format prompt for Gemini
+        steps_text = "\n".join(case.steps)
         prompt = prompt_template.format(device=device, steps=steps_text)
-
 
         model = genai.GenerativeModel("gemini-2.0-flash-exp")
         response = model.generate_content(prompt)
         raw_output = response.text.strip()
         print("🧠 Gemini Output:\n", raw_output)
 
+        # Parse Gemini response
         mapped_steps = []
         for line in raw_output.splitlines():
             try:
@@ -257,49 +478,63 @@ def generate_mapped_steps(data: MappingRequest):
         if not mapped_steps:
             raise HTTPException(status_code=500, detail="No valid steps parsed")
 
-        template_doc = templates_collection.find_one({"_id": TEMPLATE_OBJECT_ID})
-        if not template_doc:
+        # Load template JSON from SQL
+        TEMPLATE_SQL_ID = 1  # 🔁 replace with dynamic logic or config
+        template: Template = db.query(Template).filter(Template.id == TEMPLATE_SQL_ID).first()
+        if not template:
             raise HTTPException(status_code=500, detail="Template not found")
 
-        dut_key = template_doc["DUTS"][0]
-        template_dut = template_doc[dut_key]
+        template_data = template.content  # JSON field from MySQL
+
+        # Parse DUT-level structure
+        dut_keys = template_data.get("DUTS", [])
+        if not dut_keys:
+            raise HTTPException(status_code=500, detail="No DUTS key in template")
+
+        dut_key = dut_keys[0]  # e.g., "Q_ai"
+        template_dut = template_data.get(dut_key, {})
         screens = template_dut.get("SCREENS", {})
         screen_key = list(screens.keys())[0]
         screen_data = screens.get(screen_key, {})
+
         elements = screen_data.get("elements", {})
         ocr_fields = screen_data.get("ocr", {})
 
+        # Enrich mapped steps
         for step in mapped_steps:
             param = step.get("parameter")
             if not param:
                 continue
 
-            # ✅ Handle _icon and _option parameters
             if param.endswith("_icon") or param.endswith("_option"):
-                image_data = elements.get(param, [None, None, None, None])[3]
+                image_data = elements.get(param, [None, None, None, None, None])[4]
                 if not image_data:
                     fallback_key = param.replace("_icon", "").replace("_option", "")
-                    image_data = elements.get(fallback_key, [None, None, None, None])[3]
+                    image_data = elements.get(fallback_key, [None, None, None, None, None])[4]
                 if image_data:
                     step["image"] = image_data
 
             elif param in ocr_fields:
                 step[param] = ocr_fields[param]
 
-        cases_collection.update_one(
-            {"_id": ObjectId(data.case_id)},
-            {"$set": {"mapped_steps": mapped_steps}}
-        )
+        # Save mapped steps to MySQL
+        case.mapped_steps = mapped_steps
+        db.commit()
 
-        return {"case_id": data.case_id, "mapped_steps": mapped_steps}
+        return {"case_id": case.id, "mapped_steps": mapped_steps}
 
     except Exception as e:
+        db.rollback()
         print("🔥 Step generation error:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
+    finally:
+        db.close()
 
-@app.post("/execute_with_gemini")
-async def execute_with_gemini(data: CaptureRequest):
+
+
+# @app.post("/execute_with_gemini")
+# async def execute_with_gemini(data: CaptureRequest):
     try:
         print(f"\U0001F4F8 Starting action loop for step: {data.step}")
 
@@ -407,8 +642,8 @@ async def execute_with_gemini(data: CaptureRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@app.post("/execute_with_gemini")
-async def execute_with_gemini(data: CaptureRequest):
+# @app.post("/execute_with_gemini")
+# async def execute_with_gemini(data: CaptureRequest):
     try:
         print(f"\U0001F4F8 Starting action loop for step: {data.step}")
 
@@ -517,8 +752,8 @@ async def execute_with_gemini(data: CaptureRequest):
 
 
 
-@app.post("/execute_manual_step")
-async def execute_manual_step(data: StepExecutionRequest):  # expects case_id + step_name
+# @app.post("/execute_manual_step")
+# async def execute_manual_step(data: StepExecutionRequest):  # expects case_id + step_name
     try:
         case = cases_collection.find_one({"_id": ObjectId(data.case_id)})
         if not case:

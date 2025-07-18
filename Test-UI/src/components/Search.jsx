@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import DeviceContext from '../context/Temp';
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { addCase, addNewStep, deleteSingleSteps, editSingleSteps, getSingleCase, mapSteps } from '../services/allApi';
+import { addCase, addNewStep, deleteSingleSteps, editSingleSteps, getSingleCase, mapSteps, saveTemplateToDB } from '../services/allApi';
 import { useMappedSteps } from '../context/MappedStepContext';
 import { debounce } from 'lodash';
 import { useStepContext } from '../context/StepContext';
@@ -38,15 +38,53 @@ function Search() {
     const handleText = (ev) => {
         setUserQuery(ev);
     }
-    const handleCreate = () => {
+
+    const handleCreate = async () => {
         if (projectName.trim() !== '') {
-            setCreatedProject(projectName.trim());
-            localStorage.setItem("projectName", projectName.trim()); // ✅ Save to localStorage
-            setProjectName(''); // Clear input
-            setIsProjectCreated(true); // Show next section
+            const trimmedProjectName = projectName.trim();
+
+            try {
+                // Step 1: Get the active template from backend
+                const res = await fetch(VITE_ACTIVE_TEMPLATE);
+                const content = await res.json();
+
+                console.log("🎯 Active template fetched:", content);
+
+                // Step 2: Send projectName + content to your backend
+                const response = await saveTemplateToDB(trimmedProjectName, content);
+                console.log("✅ Template saved to DB:", response.data);
+
+                const templateId = response.data.id;  // ✅ Save this ID
+                localStorage.setItem("templateId", templateId);  // ✅ Store it for later
+
+                // Step 3: Proceed with local state update
+                setCreatedProject(trimmedProjectName);
+                localStorage.setItem("projectName", trimmedProjectName);
+                setProjectName('');
+                setIsProjectCreated(true);
+            } catch (err) {
+                console.error("❌ Error creating project:", err);
+            }
         }
-        console.log(projectName);
     };
+
+    const [activeTemplate, setActiveTemplate] = useState(null);
+    const VITE_ACTIVE_TEMPLATE = import.meta.env.VITE_ACTIVE_TEMPLATE;
+
+    useEffect(() => {
+        const fetchTemplate = async () => {
+            try {
+                const response = await fetch(VITE_ACTIVE_TEMPLATE);
+                const data = await response.json(); // assumes the endpoint returns JSON
+                console.log("✅ Active Template Data:", data);
+                setActiveTemplate(data);
+            } catch (error) {
+                console.error("❌ Failed to fetch active template:", error);
+            }
+        };
+
+        fetchTemplate();
+    }, [VITE_ACTIVE_TEMPLATE]);
 
 
     const handleSaveChanges = async () => {
@@ -92,11 +130,14 @@ function Search() {
         setLoading(true)
         setMapping(true)
         setShowSteps(false)
+        const templateId = localStorage.getItem("templateId");
+
         const add = {
             project_name: createdProject,
             device: device,
             model: model,
-            user_query: userQuery
+            user_query: userQuery,
+             template_id: parseInt(templateId) 
         };
 
         if (!device) {
@@ -107,7 +148,7 @@ function Search() {
             console.log("Payload being sent:", add);
 
             const response = await addCase(add)
-            if (response.status === 201) {
+            if (response.status === 200) {
                 console.log(`Case created :`, response.data);
                 setSteps(response.data.steps)
                 setEditSteps(response.data.steps)
@@ -136,7 +177,7 @@ function Search() {
     };
 
     const handleDeleteStep = async (index) => {
-        const caseId=localStorage.getItem('caseId')
+        const caseId = localStorage.getItem('caseId')
         try {
             await deleteSingleSteps(caseId, index);
             const newSteps = [...editSteps];
@@ -162,49 +203,61 @@ function Search() {
         console.log("🔍 caseId value:", caseId);
 
         const updatedSteps = [...editSteps];
-        updatedSteps[index] = newStep;
+        updatedSteps[index] = { ...updatedSteps[index], content: newStep };
         setEditSteps(updatedSteps);
         debouncedSave(caseId, index, newStep);
     };
 
-   const debouncedSave = debounce(async (caseId, index, newStep) => {
-    // Fallback to localStorage if caseId is not provided
-    const finalCaseId = caseId || localStorage.getItem('caseId');
-    
-    if (!finalCaseId) {
-        console.error("❌ caseId is missing from both arguments and localStorage");
-        return;
-    }
+    const debouncedSave = debounce(async (caseId, index, newStep) => {
+        // Fallback to localStorage if caseId is not provided
+        const finalCaseId = caseId || localStorage.getItem('caseId');
 
-    console.log("🔍 Using caseId:", finalCaseId);
-    
-    try {
-        await editSingleSteps(finalCaseId, index, newStep);
-        console.log("✅ Step auto-saved");
-    } catch (error) {
-        console.error("❌ Error in editSingleSteps:", error);
-    }
-}, 500);
+        if (!finalCaseId) {
+            console.error("❌ caseId is missing from both arguments and localStorage");
+            return;
+        }
+
+        console.log("🔍 Using caseId:", finalCaseId);
+
+        try {
+            await editSingleSteps(finalCaseId, index, newStep);
+            console.log("✅ Step auto-saved");
+        } catch (error) {
+            console.error("❌ Error in editSingleSteps:", error);
+        }
+    }, 500);
 
 
     const handleAddStep = async () => {
         const caseId = localStorage.getItem("caseId");
         if (!caseId) {
-            console.error("❌ caseId is undefined. Cannot add step.");
+            console.error("❌ caseId is undefined");
             return;
         }
 
         try {
-            const response = await addNewStep(caseId, { newStep: "Add" });
-            console.log("✅ Step added:", response.data);
+            const response = await addNewStep(caseId, { content: "New Step" });
 
-            const updatedSteps = response.data.updatedCase.steps;
-            const stepContents = updatedSteps.map(step => step.content);
-            setEditSteps(stepContents);
+            const updatedSteps = response.data.steps;
+
+            setEditSteps(
+                updatedSteps.map((step, i) => {
+                    // If step is just a string:
+                    if (typeof step === "string") {
+                        return { id: i + 1, content: step };
+                    }
+                    // If already an object:
+                    return { id: step.id ?? i + 1, content: step.content };
+                })
+            );
+
+            console.log("✅ Step added:", updatedSteps);
         } catch (error) {
             console.error("❌ Error adding step:", error);
         }
     };
+
+
 
 
 
@@ -218,8 +271,11 @@ function Search() {
         setShowSteps(false);
         setError(false);
         setMappedSteps([]);
+        setIsProjectCreated(false)
         localStorage.removeItem('caseId');
         localStorage.removeItem('steps');
+        localStorage.removeItem('projectName');
+        localStorage.removeItem('Device');
     };
 
 
@@ -507,7 +563,7 @@ function Search() {
                             {
                                 Array.isArray(editSteps) && editSteps?.map((step, index) => (
                                     <li className='text-center d-flex align-items-center my-3' key={index}>
-                                        <span className='me-4'>{index + 1}</span> <input type="text" className='form-control' value={step} onChange={(e) => { handleStepChange(caseId, index, e.target.value) }} />
+                                        <span className='me-4'>{index + 1}</span> <input type="text" className='form-control' value={step?.content ?? ""} onChange={(e) => { handleStepChange(caseId, index, e.target.value) }} />
                                         <FontAwesomeIcon className='text-danger mx-4' onClick={(() => handleDeleteStep(index))} style={{ cursor: 'pointer' }} icon={faXmark} />
                                     </li>
                                 ))
