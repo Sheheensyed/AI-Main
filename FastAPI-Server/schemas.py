@@ -1,13 +1,20 @@
 from pydantic import BaseModel
-from typing import List, Optional,Any
+from typing import List, Optional,Any,Union
 
 
 
 class StepBase(BaseModel):
-    content: str
+    id: int
+    content: Union[str, dict]  # handle both raw string and JSON
+    operationId: Optional[int]
+    caseId: int
 
-class StepCreate(StepBase):
-    pass
+    class Config:
+        orm_mode = True
+
+class StepCreate(BaseModel):
+    content: str
+    operationId: Optional[int] = None  # So steps can be linked to an operation
 
 class MappingRequest(BaseModel):
     case_id: int
@@ -15,16 +22,26 @@ class MappingRequest(BaseModel):
 
 class StepOut(BaseModel):
     id: int
-    content: str
+    content: Union[str, dict]  # in case it's a JSON string
+    operationId: Optional[int]
     class Config:
         from_attributes = True
 
 class CaseCreate(BaseModel):
     project_name: str
-    device: str
+    device: Optional[str] = None
     model:Optional[str]=''
     user_query: str
     template_id: Optional[int]  # ✅ Add this line
+
+class OperationOut(BaseModel):
+    id: int
+    goal: str
+    prerequisite: str
+    caseId: int
+
+    class Config:
+        from_attributes = True
 
 class CaseOut(BaseModel):
     id: int
@@ -34,6 +51,8 @@ class CaseOut(BaseModel):
     user_query: str
     createdAtFormatted: Optional[str]
     steps: List[StepOut]
+    operations: List[OperationOut] = []
+
 
     class Config:
         from_attributes = True
@@ -48,3 +67,26 @@ class TemplateCreate(BaseModel):
 
 class ProjectNameInput(BaseModel):
     projectName: str
+
+class OperationCreate(BaseModel):
+    goal: str
+    prerequisite: str  # ✅ use the correct column name
+    caseId: int
+
+class StepCreateSchema(BaseModel):
+    content: str
+
+class StepUpdate(BaseModel):
+    content: str
+
+class StepResponse(BaseModel):
+    id: int
+    content: str
+    operationId: int
+    caseId: int
+
+    class Config:
+        from_attributes = True
+
+class StepUpdateSchema(BaseModel):
+    content: str

@@ -2,15 +2,39 @@ import { commonApi } from './commonApi';
 import { serverUrl, serverUrlFastApi } from './serverURL';
 
 
-// Node Backend
 export const addCase = (body) => {
+  console.log("⬆️ Adding case:", body);
   return commonApi('POST', `${serverUrlFastApi}/generate-steps`, body);
 };
 
-export const addNewStep = (caseId, newStepObj) => {
+export const addNewStep = (caseId, data) => {
   console.log("⬆️ Sending step to case ID:", caseId); // add this
-  return commonApi('POST', `${serverUrlFastApi}/case/${caseId}/step`, newStepObj);
+  return commonApi('POST', `${serverUrlFastApi}/case/${caseId}/operation`, data);
 };
+
+// ✅ GET: Fetch all operations for a given case ID
+export const getOperationsByCaseId = (caseId) => {
+  console.log("📥 Fetching operations for case ID:", caseId);
+  return commonApi('GET', `${serverUrlFastApi}/case/${caseId}/operation`);
+};
+
+// dlt oprtion
+export const deleteOperation = (operationId) => {
+  return commonApi("DELETE", `${serverUrlFastApi}/operation/${operationId}`);
+};
+
+export const addStepToOperation = (operationId, content) => {
+  return commonApi('POST', `${serverUrlFastApi}/operation/${operationId}/step`, { content });
+};
+
+
+export const updateStep = (stepId, content) => {
+  return commonApi('PATCH', `${serverUrlFastApi}/step/${stepId}`, { content });
+};
+
+
+
+
 
 export const editSingleSteps = (caseId, stepIndex, updateStep) => {
   console.log("➡️ editSingleSteps() called with:", { caseId, stepIndex, updateStep });
@@ -29,7 +53,35 @@ export const saveTemplateToDB = (projectName, content) => {
   });
 };
 
+export const getAllTemplates = () => {
+  return commonApi('GET', `${serverUrlFastApi}/templates`);
+};
 
+
+export const getDutsById = (templateId) => {
+  return commonApi('GET', `${serverUrlFastApi}/duts/${templateId}`);
+};
+
+
+export const getAllCases = () => {
+  return commonApi('GET', `${serverUrlFastApi}/cases`);
+};
+
+export const getAllSteps = () => {
+  return commonApi('GET', `${serverUrlFastApi}/steps`);
+};
+
+export const deleteCase = (caseId) => {
+  return commonApi("DELETE", `${serverUrlFastApi}/cases/${caseId}`);
+};
+
+export const deleteStep = (stepId) => {
+  return commonApi("DELETE", `${serverUrlFastApi}/steps/${stepId}`);
+};
+
+export const deleteTemplate = (templateId) => {
+  return commonApi("DELETE", `${serverUrlFastApi}/templates/${templateId}`);
+};
 
 
 // export const executeSteps = (data) => {

@@ -1,12 +1,13 @@
 import React, { useContext, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import DeviceContext from '../context/Temp';
 import { faXmark } from '@fortawesome/free-solid-svg-icons'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { addCase, addNewStep, deleteSingleSteps, editSingleSteps, getSingleCase, mapSteps, saveTemplateToDB } from '../services/allApi';
+import { addCase, addNewStep, addStepToOperation, deleteOperation, deleteSingleSteps, editSingleSteps, getAllSteps, getDutsById, getOperationsByCaseId, getSingleCase, mapSteps, saveTemplateToDB, updateStep } from '../services/allApi';
 import { useMappedSteps } from '../context/MappedStepContext';
 import { debounce } from 'lodash';
 import { useStepContext } from '../context/StepContext';
+import { Card, Badge, Form, Container, Row, Col, Modal, Button } from "react-bootstrap";
 
 
 function Search() {
@@ -26,9 +27,24 @@ function Search() {
     const [projectName, setProjectName] = useState('')
     const [createdProject, setCreatedProject] = useState('')
     const [isProjectCreated, setIsProjectCreated] = useState(false)
+    const [duts, setDuts] = useState([])
+    const [operations, setOperations] = useState([]);
+    const [showModal, setShowModal] = useState(false);
+    const [goalInput, setGoalInput] = useState("");
+    const [prerequisiteInput, setPrerequisiteInput] = useState("");
+    const [addingStepOpId, setAddingStepOpId] = useState(null);
+    const [stepContent, setStepContent] = useState("");
+    const [currentStepId, setCurrentStepId] = useState(null);
+    const [editStepContent, setEditStepContent] = useState('');
+    const [newStepContent, setNewStepContent] = useState('');
+    const [stepContents, setStepContents] = useState({});
+
+
+
+
+
     // const [contents, setContents] = useState('')
     // const [text, setText] = useState('')
-
     // console.log(userQuery);
 
     const handleClear = () => {
@@ -86,28 +102,23 @@ function Search() {
         fetchTemplate();
     }, [VITE_ACTIVE_TEMPLATE]);
 
+    const templateId = localStorage.getItem('templateId')
+    useEffect(() => {
+        const fetchDuts = async () => {
+            try {
+                const response = await getDutsById(templateId);
+                setDuts(response.data.duts);
+            } catch (error) {
+                console.error('Failed to fetch DUTs:', error);
+            }
+        };
 
-    const handleSaveChanges = async () => {
-        try {
-            const updatePromises = editSteps.map((step, index) => {
-                if (step !== steps[index]) {
-                    const payload = { newStep: step };
-                    console.log(`📦 Sending update for step ${index}:`, payload);
-                    return editSingleSteps(caseId, index, step); // Only send if edited
-                }
-                return null;
-            });
-
-            const results = await Promise.all(updatePromises.filter(Boolean));
-            console.log("✅ Updated steps:", results);
-
-            setSteps([...editSteps]); // Update UI after success
-        } catch (error) {
-            console.log("❌ Error updating step:", error);
+        if (templateId) {
+            fetchDuts();
         }
+    }, [templateId]);
 
-        setShow(false);
-    };
+
 
     const handleClose = () => {
         setShow(false)
@@ -123,8 +134,8 @@ function Search() {
 
     const handleSubmit = async (e) => {
         // e.preventDefault()
-        // if (!userQuery || !device) {
-        //     alert('Please enter both prompt and device');
+        // if (!userQuery) {
+        //     alert('Please enter Your prompt');
         //     return;
         // }
         setLoading(true)
@@ -134,31 +145,56 @@ function Search() {
 
         const add = {
             project_name: createdProject,
-            device: device,
+            // device: device,
             model: model,
             user_query: userQuery,
-             template_id: parseInt(templateId) 
+            template_id: parseInt(templateId)
         };
 
-        if (!device) {
-            setError(true)
-            return;
-        }
+        // if (!device) {
+        //     setError(true)
+        //     return;
+        // }
         try {
             console.log("Payload being sent:", add);
 
             const response = await addCase(add)
             if (response.status === 200) {
                 console.log(`Case created :`, response.data);
-                setSteps(response.data.steps)
-                setEditSteps(response.data.steps)
-                setCaseId(response.data._id)
-                localStorage.setItem("caseId", response.data.id); // ✅ Save to localStorage
-                localStorage.setItem("steps", JSON.stringify(response.data.steps));
+                console.log(response.data);
+                setUserQuery(response.data.user_query)
+
+                const parsedSteps = response.data.steps.map((s) => ({
+                    ...s,
+                    content: { step: s.content }, // Wrap plain string in an object
+                }));
+
+
+
+
+                const parsedOperations = (response.data.operations || []).map((op) => {
+                    let parsedStepSummary = [];
+                    try {
+                        parsedStepSummary = JSON.parse(op.step_summary);
+                    } catch (err) {
+                        console.warn("Invalid JSON in operation.step_summary:", op.step_summary);
+                    }
+                    return {
+                        ...op,
+                        step_summary: parsedStepSummary
+                    };
+                });
+
+                setSteps(parsedSteps);
+                setEditSteps(parsedSteps);
+                setOperations(parsedOperations)
+                setCaseId(response.data.id);
+                localStorage.setItem("caseId", response.data.id);
+                localStorage.setItem("steps", JSON.stringify(parsedSteps));
+                setShowSteps(true)
             } else {
                 console.log(`Unexpected Response : `, response);
             }
-            setShowSteps(true)
         } catch (error) {
             console.log(`Error saving to backend :`, error);
         }
@@ -168,23 +204,14 @@ function Search() {
         }
     }
 
-    const handleDeviceChange = (e) => {
-        setDevice(e.target.value);
-        setSteps([]);
-        if (textareaRef.current) {
-            textareaRef.current.focus();
-        }
-    };
 
-    const handleDeleteStep = async (index) => {
-        const caseId = localStorage.getItem('caseId')
+    const handleDeleteStep = async (stepId) => {
         try {
-            await deleteSingleSteps(caseId, index);
-            const newSteps = [...editSteps];
-            newSteps.splice(index, 1);
-            setEditSteps(newSteps);
-        } catch (error) {
-            console.log("Error deleting step:", error);
+            await deleteStep(stepId);
+            setSteps(prev => prev.filter(step => step.id !== stepId));
+            console.log("🗑️ Step deleted:", stepId);
+        } catch (err) {
+            console.error("❌ Failed to delete step:", err);
         }
     };
 
@@ -197,65 +224,200 @@ function Search() {
 
 
 
-    const handleStepChange = async (caseId, index, newStep) => {
-        console.log("🔍 handleStepChange params:", { caseId, index, newStep });
-        console.log("🔍 caseId type:", typeof caseId);
-        console.log("🔍 caseId value:", caseId);
+    // const handleStepChange = async (caseId, index, newStep) => {
+    //     console.log("🔍 handleStepChange params:", { caseId, index, newStep });
+    //     console.log("🔍 caseId type:", typeof caseId);
+    //     console.log("🔍 caseId value:", caseId);
 
-        const updatedSteps = [...editSteps];
-        updatedSteps[index] = { ...updatedSteps[index], content: newStep };
-        setEditSteps(updatedSteps);
-        debouncedSave(caseId, index, newStep);
+    //     const updatedSteps = [...editSteps];
+    //     updatedSteps[index] = { ...updatedSteps[index], content: newStep };
+    //     setEditSteps(updatedSteps);
+    //     debouncedSave(caseId, index, newStep);
+    // };
+
+    const handleStepChange = (value, operationId, stepId) => {
+        setStepContent(value);
+        debouncedSave(value, operationId, stepId);
     };
 
-    const debouncedSave = debounce(async (caseId, index, newStep) => {
-        // Fallback to localStorage if caseId is not provided
-        const finalCaseId = caseId || localStorage.getItem('caseId');
 
-        if (!finalCaseId) {
-            console.error("❌ caseId is missing from both arguments and localStorage");
-            return;
-        }
 
-        console.log("🔍 Using caseId:", finalCaseId);
-
+    const handleShowInput = async (opId) => {
         try {
-            await editSingleSteps(finalCaseId, index, newStep);
-            console.log("✅ Step auto-saved");
-        } catch (error) {
-            console.error("❌ Error in editSingleSteps:", error);
+            const res = await addStepToOperation(opId, "");
+            if (res?.data?.data) {
+                const newStep = res.data.data;
+                setSteps(prev => [...prev, newStep]);
+                setCurrentStepId(newStep.id);
+                setStepContents(prev => ({ ...prev, [newStep.id]: "" }));
+            }
+        } catch (err) {
+            console.error("❌ Failed to create step:", err);
+        }
+    };
+
+
+
+
+
+
+    // const debouncedSave = debounce(async (caseId, index, newStep) => {
+    //     // Fallback to localStorage if caseId is not provided
+    //     const finalCaseId = caseId || localStorage.getItem('caseId');
+
+    //     if (!finalCaseId) {
+    //         console.error("❌ caseId is missing from both arguments and localStorage");
+    //         return;
+    //     }
+
+    //     console.log("🔍 Using caseId:", finalCaseId);
+
+    //     try {
+    //         await editSingleSteps(finalCaseId, index, newStep);
+    //         console.log("✅ Step auto-saved");
+    //     } catch (error) {
+    //         console.error("❌ Error in editSingleSteps:", error);
+    //     }
+    // }, 500);
+
+
+    const debouncedSave = debounce(async (newContent, stepId) => {
+        try {
+            await updateStep(stepId, newContent); // call your PATCH API
+            console.log("✅ Step updated:", stepId);
+
+            fetchAllSteps(); // ✅ re-fetch updated steps
+        } catch (err) {
+            console.error("❌ Failed to update step:", err);
         }
     }, 500);
 
 
+
+
+
+
+    const debouncedUpdate = debounce(async (value, stepId) => {
+        try {
+            await updateStep(stepId, value);  // PATCH / PUT to update step content
+            console.log("✅ Step updated:", value);
+        } catch (err) {
+            console.error("❌ Update failed:", err.response?.data || err);
+        }
+    }, 500);
+
+
+
+    // const handleAddStep = async () => {
+    //     const caseId = localStorage.getItem("caseId");
+    //     if (!caseId) {
+    //         console.error("❌ caseId is undefined");
+    //         return;
+    //     }
+
+    //     try {
+    //         const response = await addNewStep(caseId, { content: "New Step" });
+
+    //         const updatedSteps = response.data?.steps || [];
+
+    //         setEditSteps(
+    //             updatedSteps.map((step, i) => {
+    //                 if (typeof step === "string") {
+    //                     return { id: i + 1, content: step };
+    //                 }
+    //                 return { id: step.id ?? i + 1, content: step.content };
+    //             })
+    //         );
+
+    //         console.log("✅ Step added:", updatedSteps);
+    //     } catch (error) {
+    //         console.error("❌ Error adding step:", error?.response?.data || error);
+    //     }
+    // };
+
     const handleAddStep = async () => {
+        if (!newStepContent.trim()) return;
+
+        try {
+            console.log("🚀 Calling API with:", addingStepOpId, newStepContent);
+            const res = await addStepToOperation(addingStepOpId, newStepContent);
+            console.log("✅ Step added:", res.data);
+
+            await fetchAllSteps();
+            setNewStepContent("");
+            setAddingStepOpId(null);
+        } catch (err) {
+            console.error("❌ Failed to add step:", err);
+        }
+    };
+
+
+
+
+
+
+    const handleAddOperation = async () => {
         const caseId = localStorage.getItem("caseId");
-        if (!caseId) {
-            console.error("❌ caseId is undefined");
+        if (!goalInput || !prerequisiteInput || !caseId) {
+            alert("Please fill all fields");
             return;
         }
 
+        const newOpData = {
+            goal: goalInput,
+            prerequisite: prerequisiteInput,
+            caseId: parseInt(caseId),
+        };
+
         try {
-            const response = await addNewStep(caseId, { content: "New Step" });
+            const response = await addNewStep(caseId, newOpData); // your existing API function
+            console.log("✅ Operation added:", response.data);
 
-            const updatedSteps = response.data.steps;
-
-            setEditSteps(
-                updatedSteps.map((step, i) => {
-                    // If step is just a string:
-                    if (typeof step === "string") {
-                        return { id: i + 1, content: step };
-                    }
-                    // If already an object:
-                    return { id: step.id ?? i + 1, content: step.content };
-                })
-            );
-
-            console.log("✅ Step added:", updatedSteps);
+            // Refresh operations from backend or update UI manually here if needed
+            fetchAllOperations(); // Optional - if you have a refresh function
+            setShowModal(false);
+            setGoalInput("");
+            setPrerequisiteInput("");
         } catch (error) {
-            console.error("❌ Error adding step:", error);
+            console.error("❌ Error adding operation:", error?.response?.data || error);
         }
     };
+
+    const fetchAllOperations = async () => {
+        const caseId = localStorage.getItem("caseId");
+        try {
+            const response = await getOperationsByCaseId(caseId);
+            setOperations(response.data);
+        } catch (error) {
+            console.error("❌ Failed to fetch operations:", error);
+        }
+    };
+
+    const fetchAllSteps = async () => {
+        const caseId = localStorage.getItem("caseId");
+        try {
+            const response = await getAllSteps(caseId); // <- your API function
+            setSteps(response.data);
+        } catch (error) {
+            console.error("❌ Failed to fetch steps:", error);
+        }
+    };
+
+    const handleDeleteOperation = async (operationId) => {
+        if (!window.confirm("Are you sure you want to delete this operation and its steps?")) return;
+
+        try {
+            const response = await deleteOperation(operationId);
+            console.log("✅ Deleted:", response.data);
+
+            // Refresh operations and steps
+            fetchAllOperations();
+            fetchAllSteps();
+        } catch (err) {
+            console.error("❌ Failed to delete operation:", err);
+        }
+    };
+
 
 
 
@@ -276,6 +438,7 @@ function Search() {
         localStorage.removeItem('steps');
         localStorage.removeItem('projectName');
         localStorage.removeItem('Device');
+        localStorage.removeItem('templateId');
     };
 
 
@@ -332,13 +495,19 @@ function Search() {
         };
     }, []);
 
+    console.log(editSteps);
+    console.log(steps);
+    console.log(operations);
+
+
+
 
     return (
         <>
 
 
 
-            <div className='d-flex mt-5 vh-100 w-100 justify-content-center align-items-center flex-column'>
+            <div className='d-flex mt-5 p-5 min-vh-100 w-100 justify-content-center align-items-center flex-column'>
 
                 {!isProjectCreated && (
                     <div className='border-info my-5 w-50 p-1 rounded-4' style={{
@@ -411,11 +580,12 @@ function Search() {
                             <p className='text-center'>Project Name : {createdProject}</p>
 
                             <h6 hidden={steps.length > 0} className="mt-4 text-center">
-                                Select Device Under Test (DUT) <span className="text-danger">*</span>
+                                {/* Select Device Under Test (DUT) <span className="text-danger">*</span> */}
+                                Devices Fetched<span className="text-danger">*</span>
                             </h6>
 
                             <div className='d-flex justify-content-center mx-5'>
-                                <select className={`form-select ${error ? "border border-danger border-2" : device ? "border border-primary border-1" : ""
+                                {/* <select className={`form-select ${error ? "border border-danger border-2" : device ? "border border-primary border-1" : ""
                                     }, my-3 w-50 ms-5 me-1  text-center m-auto`}
                                     value={device}
                                     onChange={handleDeviceChange}
@@ -458,15 +628,22 @@ function Search() {
                                     <option value="Nothing">Nothing</option>
                                     <option value="Moto">Moto</option>
                                     <option value="Samsung">Samsung</option>
-                                </select>
+                                </select> */}
+
+                                {duts.map((dut, index) => (
+                                    <div className='d-flex justify-content-center' key={index}>
+                                        <input type="text" value={dut} className='form-control my-3 ms-5' readOnly />
+                                    </div>
+                                ))}
 
                             </div>
+
 
                             <form
                                 className="w-100 text-center"
                                 onSubmit={(e) => {
                                     e.preventDefault();
-                                    if (device && userQuery.trim()) {
+                                    if (userQuery.trim()) {
                                         handleSubmit();
                                     }
                                 }}
@@ -494,12 +671,14 @@ function Search() {
                                 <div className='d-flex mb-3'>
                                     <input type="text" value='Find IOS Version' className='form-control ms-2' onFocus={(e) => { handleText(e.target.value) }} readOnly />
                                     <input type="text" value='Find Device Storage' className='form-control mx-2' onFocus={(e) => { handleText(e.target.value) }} readOnly />
-                                    <input type="text" value='Find Model Name' className='form-control me-2' onFocus={(e) => { handleText(e.target.value) }} readOnly />
+                                    <input type="text" value='Find App Size' className='form-control mx-2' onFocus={(e) => { handleText(e.target.value) }} readOnly />
+
+
                                 </div>
                                 <button
                                     hidden={steps.length > 0}
                                     className={`mx-3 my-3 px-5`}
-                                    disabled={!userQuery || !device || loading}
+                                    disabled={!userQuery || loading}
                                     type='submit' style={{
                                         height: '35px',
                                         // display: 'inline-flex',
@@ -511,10 +690,10 @@ function Search() {
                                         outline: 0,
                                         border: 'none',
                                         // transition: 'background-color 250ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 250ms cubic-bezier(0.4, 0, 0.2, 1), color 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-                                        background: (!userQuery.trim() || !device)
+                                        background: (!userQuery.trim())
                                             ? '#999' // Grey when disabled
                                             : 'linear-gradient(135deg, rgba(51, 191, 255) -26.55%, rgba(93, 92, 229) 93.75%)',
-                                        cursor: (!userQuery.trim() || !device) ? 'not-allowed' : 'pointer',
+                                        cursor: (!userQuery.trim()) ? 'not-allowed' : 'pointer',
                                         opacity: loading ? 0.7 : 1,
                                         borderRadius: '8px',
                                     }}
@@ -553,30 +732,134 @@ function Search() {
                     </div>
                 ) : steps?.length > 0 ? (
                     <div className=' w-50 mt-3 shadow-lg rounded-4' style={{ padding: '4px', border: '0.5px solid transparent', backgroundImage: 'linear-gradient(white, white), linear-gradient(-45deg,rgb(108, 110, 233),rgba(100, 93, 227, 0.75),rgb(0, 140, 255),rgb(0, 183, 255))', backgroundClip: 'content-box, border-box' }}>
-                        <h5 className='text-center my-2'>Generated Steps</h5>
+                        <h4 className='text-center mt-3 my-0'>Generated Steps</h4>
+
+
 
                         <ol>
+
                             {/* {steps.map((item, index) => (
                                 <li className='text-center' key={index}> {item} </li>
-                            ))} */}
+                                ))} */}
 
-                            {
-                                Array.isArray(editSteps) && editSteps?.map((step, index) => (
-                                    <li className='text-center d-flex align-items-center my-3' key={index}>
-                                        <span className='me-4'>{index + 1}</span> <input type="text" className='form-control' value={step?.content ?? ""} onChange={(e) => { handleStepChange(caseId, index, e.target.value) }} />
-                                        <FontAwesomeIcon className='text-danger mx-4' onClick={(() => handleDeleteStep(index))} style={{ cursor: 'pointer' }} icon={faXmark} />
-                                    </li>
-                                ))
+                            <Container className="pt-3">
+                                {Array.isArray(operations) && operations.map((operation, index) => (
+                                    <Card key={operation.id || index} className="mb-4">
+                                        <Card.Header>
+                                            <div className="d-flex justify-content-between align-items-center gap-3">
+                                                <Badge bg="secondary">{`Operation ${index + 1}`}</Badge>
+                                                <Badge bg="" className='pe-auto text-danger' style={{ cursor: "pointer" }} onClick={() => handleDeleteOperation(operation.id)}>X</Badge>
+                                            </div>
 
-                            }
+                                            <Form.Group className="mt-3">
+                                                <Form.Label className="fw-semibold text-dark">Goal</Form.Label>
+                                                <Form.Control
+                                                    type="text"
+                                                    id={`operation-${operation.id || index}`}
+                                                    value={operation.goal}
+                                                    readOnly
+                                                />
 
+                                            </Form.Group>
+                                        </Card.Header>
+
+                                        <Card.Body>
+                                            <div className="ps-3">
+                                                <Form.Group className="mb-3">
+                                                    <Form.Label className="fw-semibold text-primary">Pre-requisite</Form.Label>
+                                                    <Form.Control type="text" value={operation.prerequisite} readOnly />
+                                                </Form.Group>
+
+                                                <Form.Group className="mb-3">
+                                                    <Form.Label className="fw-semibold text-success">Steps</Form.Label>
+
+                                                    {/* Steps for this operation */}
+                                                    {steps
+                                                        .filter((step) => String(step.operationId) === String(operation.id))
+                                                        .map((step) => (
+                                                            <div key={step.id} className="d-flex align-items-center mb-2">
+                                                                {step.id === currentStepId ? (
+                                                                    <Form.Control
+                                                                        type="text"
+                                                                        autoFocus
+                                                                        value={stepContents[step.id] || ""}
+                                                                        onChange={(e) => {
+                                                                            const newVal = e.target.value;
+                                                                            setStepContents(prev => ({ ...prev, [step.id]: newVal }));
+                                                                            debouncedSave(newVal, step.id);
+                                                                        }}
+                                                                        onBlur={() => setCurrentStepId(null)}
+                                                                        className="me-2"
+                                                                    />
+                                                                    // <Form.Control
+                                                                    //     type="text"
+                                                                    //     value={stepContent}
+                                                                    //     onChange={(e) => {
+                                                                    //         const newValue = e.target.value;
+                                                                    //         setStepContent(newValue);
+                                                                    //         debouncedSave(newValue, step.id); // 🔁 auto-save to DB
+                                                                    //     }}
+                                                                    //     onBlur={() => {
+                                                                    //         setCurrentStepId(null); // ✅ return to read-only mode after blur
+                                                                    //         fetchAllSteps();        // ✅ re-fetch updated steps from DB
+                                                                    //     }}
+                                                                    //     className="me-2"
+                                                                    // />
+
+                                                                ) : (
+                                                                    <Form.Control
+                                                                        type="text"
+                                                                        value={
+                                                                            typeof step.content === "object"
+                                                                                ? step.content.step || step.content.description || JSON.stringify(step.content)
+                                                                                : String(step.content)
+                                                                        }
+                                                                        readOnly
+                                                                        className="me-2"
+                                                                    />
+                                                                )}
+
+                                                                {/* ❌ Delete Step */}
+                                                                <Badge
+                                                                    className="ms-2 bg-white text-danger"
+                                                                    style={{ cursor: "pointer", minWidth: "24px", textAlign: "center" }}
+                                                                    onClick={() => handleDeleteStep(step.id)}
+                                                                    title="Delete step"
+                                                                >
+                                                                    ×
+                                                                </Badge>
+                                                            </div>
+                                                        ))}
+
+                                                    {/* Show if no steps exist */}
+                                                    {steps.filter(step => String(step.operationId) === String(operation.id)).length === 0 && (
+                                                        <div className="text-muted fst-italic">No steps added yet</div>
+                                                    )}
+
+                                                    {/* Add Step button */}
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-primary mt-2"
+                                                        style={{ height: "30px", width: "85px", fontSize: "12px" }}
+                                                        onClick={() => handleShowInput(operation.id)}
+                                                    >
+                                                        Add Step
+                                                    </button>
+                                                </Form.Group>
+
+
+                                            </div>
+                                        </Card.Body>
+
+                                    </Card>
+                                ))}
+                            </Container>
 
                         </ol>
 
-
                         <div className='d-flex justify-content-center align-items-center my-2'>
                             <button className='btn btn-warning' hidden onClick={handleShow}>Edit</button>
-                            <button className='btn btn-outline-success px-4' onClick={handleAddStep}> Add Step</button>
+                            <button className='btn btn-outline-success px-4' onClick={() => setShowModal(true)}> Add Step</button>
                             <button type='button'
                                 className='btn btn-outline-danger mx-3 px-5'
                                 disabled={steps.length === 0}
@@ -606,41 +889,41 @@ function Search() {
                     </div>
                 ) : null}
 
+
                 {/* Edit */}
-                {/* <Modal show={show} onHide={handleClose}>
+                <Modal show={showModal} onHide={() => setShowModal(false)} centered>
                     <Modal.Header closeButton>
-                        <Modal.Title>Edit Steps</Modal.Title>
+                        <Modal.Title>Add New Operation</Modal.Title>
                     </Modal.Header>
                     <Modal.Body>
-                        <ul>
-                            {
-                                Array.isArray(editSteps) && editSteps?.map((item, index) => (
-                                    <li className='text-center d-flex align-items-center my-3' key={index}>
-                                        <input type="text" className='form-control' value={item} onChange={(e) => { handleStepChange(index, e.target.value) }} />
-                                        <FontAwesomeIcon className='text-danger mx-2' onClick={(() => handleDeleteStep(index))} style={{ cursor: 'pointer' }} icon={faXmark} />
-                                    </li>
-                                ))
-
-                            }
-
-                        </ul>
-                        <div className='d-flex justify-content-center'>
-                            <button className='btn btn-primary' onClick={handleAddStep}>
-                                Add Step
-                            </button>
-
-
-                        </div>
+                        <Form.Group className="mb-3">
+                            <Form.Label>Goal</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="Enter goal"
+                                value={goalInput}
+                                onChange={(e) => setGoalInput(e.target.value)}
+                            />
+                        </Form.Group>
+                        <Form.Group>
+                            <Form.Label>Prerequisite</Form.Label>
+                            <Form.Control
+                                type="text"
+                                placeholder="Enter prerequisite"
+                                value={prerequisiteInput}
+                                onChange={(e) => setPrerequisiteInput(e.target.value)}
+                            />
+                        </Form.Group>
                     </Modal.Body>
                     <Modal.Footer>
-                        <Button variant="secondary" onClick={handleClose}>
-                            Close
+                        <Button variant="secondary" onClick={() => setShowModal(false)}>
+                            Cancel
                         </Button>
-                        <Button variant="primary" onClick={handleSaveChanges}>
-                            Save Changes
+                        <Button variant="primary" onClick={handleAddOperation}>
+                            Add
                         </Button>
                     </Modal.Footer>
-                </Modal> */}
+                </Modal>
 
 
             </div>
