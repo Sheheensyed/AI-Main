@@ -8,6 +8,7 @@ function Left_Panel() {
     const { active, setActive } = useCaseContext()
     // const [isFocused, setIsFocused] = useState(false);
     console.log(mappedSteps);
+    console.log(query);
 
 
 
@@ -83,23 +84,23 @@ function Left_Panel() {
 
                     <ol >
                         {mappedSteps.length ? mappedSteps.map((mStep, index) => (
-                                <div key={index || mStep._id} className=' my-2 border p-2 rounded-3 d-flex'>
-                                    <span className='bg-dark text-white rounded-2 d-flex justify-content-center align-items-center me-2' style={{
-                                        //  borderRadius: '50%',
-                                        width: '25px', height: '25px', boxSizing: 'border-box',
-                                        letterSpacing: '0.05857em',
-                                        boxShadow: 'rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px',
-                                        color: 'white',
-                                        fontSize: '15px',
-                                        outline: 0,
-                                        border: 'none',
-                                        transition: 'background-color 250ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 250ms cubic-bezier(0.4, 0, 0.2, 1), color 250ms cubic-bezier(0.4, 0, 0.2, 1)',
-                                        background: 'linear-gradient(135deg,rgba(51, 191, 255)-26.55%,rgba(93, 92, 229)93.75%',
-                                        borderRadius: '8px',
-                                    }}>{index + 1}</span>
-                                    <strong className='ms-2'></strong>
-                                    {mStep.step}
-                                </div>
+                            <div key={index || mStep._id} className=' my-2 border p-2 rounded-3 d-flex'>
+                                <span className='bg-dark text-white rounded-2 d-flex justify-content-center align-items-center me-2' style={{
+                                    //  borderRadius: '50%',
+                                    width: '25px', height: '25px', boxSizing: 'border-box',
+                                    letterSpacing: '0.05857em',
+                                    boxShadow: 'rgba(0, 0, 0, 0.2) 0px 3px 1px -2px, rgba(0, 0, 0, 0.14) 0px 2px 2px 0px, rgba(0, 0, 0, 0.12) 0px 1px 5px 0px',
+                                    color: 'white',
+                                    fontSize: '15px',
+                                    outline: 0,
+                                    border: 'none',
+                                    transition: 'background-color 250ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 250ms cubic-bezier(0.4, 0, 0.2, 1), border-color 250ms cubic-bezier(0.4, 0, 0.2, 1), color 250ms cubic-bezier(0.4, 0, 0.2, 1)',
+                                    background: 'linear-gradient(135deg,rgba(51, 191, 255)-26.55%,rgba(93, 92, 229)93.75%',
+                                    borderRadius: '8px',
+                                }}>{index + 1}</span>
+                                <strong className='ms-2'></strong>
+                                {mStep.step}
+                            </div>
                             // <div className='d-flex flex-column my-2'>
                             //     <div className='d-flex justify-content-center'>
                             //         <input

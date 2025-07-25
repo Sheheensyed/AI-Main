@@ -24,6 +24,8 @@ class StepOut(BaseModel):
     id: int
     content: Union[str, dict]  # in case it's a JSON string
     operationId: Optional[int]
+    visual_description: Optional[str]
+    device: Optional[str]
     class Config:
         from_attributes = True
 
@@ -39,6 +41,7 @@ class OperationOut(BaseModel):
     goal: str
     prerequisite: str
     caseId: int
+    steps: List[StepOut] = [] 
 
     class Config:
         from_attributes = True
@@ -50,12 +53,17 @@ class CaseOut(BaseModel):
     model: str
     user_query: str
     createdAtFormatted: Optional[str]
-    steps: List[StepOut]
+    # steps: List[StepOut]
     operations: List[OperationOut] = []
 
 
     class Config:
         from_attributes = True
+
+class GenerateStepsResponse(BaseModel):
+    status: str
+    warning: Optional[str]
+    case: CaseOut
 
 class StepEdit(BaseModel):
     newStep:str
@@ -90,3 +98,11 @@ class StepResponse(BaseModel):
 
 class StepUpdateSchema(BaseModel):
     content: str
+
+class MappingRequest(BaseModel):
+    case_id: int
+    steps: List[str]  # 👈 steps should be a list of strings
+
+class MappedStepCreate(BaseModel):
+    case_id: int
+    ...

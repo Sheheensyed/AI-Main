@@ -27,11 +27,16 @@ export const addStepToOperation = (operationId, content) => {
   return commonApi('POST', `${serverUrlFastApi}/operation/${operationId}/step`, { content });
 };
 
-
+// To edit step under operations
 export const updateStep = (stepId, content) => {
   return commonApi('PATCH', `${serverUrlFastApi}/step/${stepId}`, { content });
 };
 
+// To delete step under operatoins
+export const deleteStepFromOperation = (operationId, stepId) => {
+  console.log(`❌ Step deleted from operation : ${operationId} step : ${stepId}`,);
+  return commonApi('DELETE', `${serverUrlFastApi}/operation/${operationId}/step/${stepId}`)
+}
 
 
 
@@ -98,7 +103,7 @@ export const deleteTemplate = (templateId) => {
 
 export const getSingleCase = (id) => {
   console.log("getSingleCase :", id)
-  return commonApi("GET", `${serverUrl}/cases/${id}`);
+  return commonApi("GET", `${serverUrlFastApi}/cases/${id}/mapped-steps`);
 };
 
 

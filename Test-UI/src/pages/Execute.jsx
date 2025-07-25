@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { getSingleCase } from '../services/allApi';
+import { addCase, getSingleCase } from '../services/allApi';
 import { Link, useParams } from 'react-router-dom';
 import SplitPane from 'react-split-pane';
 import '../styles/split-pane.css';
@@ -32,6 +32,10 @@ function Execute() {
         const fetchCase = async () => {
             try {
                 const res = await getSingleCase(caseId);
+                console.log(res.data);
+                
+                
+                
                 setSteps(res.data.steps || []);
                 setCount(res.data.steps?.length || 0);
                 setMappedSteps(res.data.mapped_steps || []);

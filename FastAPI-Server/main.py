@@ -19,26 +19,25 @@ from function import abort, swipe, capture_screen, tap, get_text
 # from db import templates_collection, cases_collection
 from PIL import Image
 import io
+from sqlalchemy import create_engine,func
 from sqlalchemy import create_engine
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base,joinedload
 
 from fastapi import Depends
 from sqlalchemy.orm import Session
 from db import SessionLocal
-from models import Case
 from schemas import (
     MappingRequest,
     StepUpdate,
     StepEdit,
-    OperationCreate,OperationOut,StepCreateSchema,StepUpdateSchema
+    OperationCreate,OperationOut,StepCreateSchema,StepUpdateSchema,GenerateStepsResponse
 )  # create this pydantic model
 
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
-from models import Base, Case, Step, Template, Operation
+from models import Base, Case, Step, Template, Operation,MappedStep
 from db import engine, SessionLocal
-from schemas import CaseCreate, CaseOut, ProjectNameInput
+from schemas import CaseCreate, CaseOut, ProjectNameInput,MappingRequest
 from datetime import datetime
 import requests
 import json
@@ -132,12 +131,6 @@ class PyObjectId(ObjectId):
 class StepExecutionRequest(BaseModel):
     case_id: str
     step: str
-
-
-# --- Pydantic Models ---
-class MappingRequest(BaseModel):
-    steps: List[str]
-    case_id: str
 
 
 class CaptureRequest(BaseModel):
@@ -321,16 +314,14 @@ def get_latest_base64_image(case_id: str, exclude_image_id: ObjectId) -> str:
 #     except Exception as e:
 #         raise HTTPException(status_code=500, detail=str(e))
 
-
-@app.post("/generate-steps", response_model=CaseOut)
+# To generate opeartions,Pre-requisites,steps
+@app.post("/generate-steps", response_model=GenerateStepsResponse)
 def generate_steps_route(payload: CaseCreate, db: Session = Depends(get_db)):
     try:
-        # Step 1: Fetch template to get DUTs
+        # Step 1: Fetch template and extract DUTs
         template = db.query(Template).filter(Template.id == payload.template_id).first()
         if not template or not template.duts:
-            raise HTTPException(
-                status_code=400, detail="Template not found or missing DUTs"
-            )
+            raise HTTPException(status_code=400, detail="Template not found or missing DUTs")
 
         dut_1 = template.duts[0] if len(template.duts) > 0 else None
         dut_2 = template.duts[1] if len(template.duts) > 1 else None
@@ -338,7 +329,7 @@ def generate_steps_route(payload: CaseCreate, db: Session = Depends(get_db)):
         if not dut_1:
             raise HTTPException(status_code=400, detail="No DUTs found in template")
 
-        # Step 2: Save Case (include DUTs)
+        # Step 2: Save the Case
         new_case = Case(
             project_name=payload.project_name,
             device=dut_1,
@@ -353,51 +344,115 @@ def generate_steps_route(payload: CaseCreate, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(new_case)
 
-        # Step 3: Generate steps using Gemini with dut_1 and dut_2
+                # Step 3: Generate steps using Gemini
         device_list = [dut_1]
         if dut_2:
             device_list.append(dut_2)
 
         steps_list = generate_steps(payload.user_query, device_list)
 
-        if isinstance(steps_list, dict) and "steps" in steps_list:
-            steps_list = steps_list["steps"]
+        if not isinstance(steps_list, list):
+            return GenerateStepsResponse(
+                status="success",
+                warning="Gemini failed to return valid steps.",
+                case=CaseOut.model_validate(new_case)
+            )
 
-        # Step 4: Save operations and individual steps
+
+        # Step 4: Save operations and steps
         for op in steps_list:
-            goal = op.get("goal")
+            raw_goal = op.get("goal")
             prerequisite = op.get("prerequisite")
-            step_summary = json.dumps(op.get("step"))  # Save summary of steps
 
+            if not raw_goal or raw_goal.strip() == "":
+                print("❌ Skipped operation due to missing goal:", op)
+                continue  # Skip this operation
+
+            goal = raw_goal
+            operation_device = None
+
+            # Extract device from "On DEVICE: goal" pattern
+            if raw_goal.startswith("On ") and ":" in raw_goal:
+                try:
+                    operation_device = raw_goal.split(":")[0].replace("On ", "").strip()
+                    goal = raw_goal.split(":", 1)[1].strip()
+                except:
+                    pass
+
+            # Save operation
             new_operation = Operation(
-                goal=goal, prerequisite=prerequisite, caseId=new_case.id
+                goal=goal,
+                prerequisite=prerequisite,
+                device=operation_device,
+                caseId=new_case.id,
             )
             db.add(new_operation)
             db.commit()
             db.refresh(new_operation)
 
-            # Save each sub-step (as list or single string)
+            # Handle steps (could be string, dict, or list)
             steps = op.get("step")
             if isinstance(steps, str):
+                steps = [{"step": steps, "visual_description": None}]
+            elif isinstance(steps, dict):
                 steps = [steps]
-            for single_step in steps:
+            elif not isinstance(steps, list):
+                continue  # Skip if invalid
+
+            for step_obj in steps:
+                # Step and visual description handling
+                step_data = step_obj.get("step")
+
+                if isinstance(step_data, dict):
+                    step_content = step_data.get("step")
+                    visual_desc = step_data.get("visual_description")
+                else:
+                    step_content = step_data
+                    visual_desc = step_obj.get("visual_description")
+
+                step_device = None
+                cleaned_step = step_content
+
+                if not step_content or step_content.strip() == "":
+                    print("❌ Skipped step due to missing content:", step_obj)
+                    continue
+
+                if step_content.startswith("On ") and ":" in step_content:
+                    try:
+                        step_device = step_content.split(":")[0].replace("On ", "").strip()
+                        cleaned_step = step_content.split(":", 1)[1].strip()
+                    except:
+                        pass
+
                 db.add(
                     Step(
-                        content=single_step,
+                        content=cleaned_step,
+                        visual_description=visual_desc,
                         caseId=new_case.id,
                         operationId=new_operation.id,
+                        device=step_device
                     )
                 )
-
                 db.commit()
 
-        # Step 5: Return the Case with steps
-        db.refresh(new_case)
-        return CaseOut.model_validate(new_case)
+
+        # Step 5: Refetch full case with operations and steps
+        full_case = db.query(Case).options(
+            joinedload(Case.operations).joinedload(Operation.steps)
+        ).filter(Case.id == new_case.id).first()
+
+        return GenerateStepsResponse(
+            status="success",
+            warning=None,
+            case=CaseOut.model_validate(full_case)
+        )
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+
+# @app.get("/generate-steps/",response_model=)
 
 # main.py
 @app.post("/case/{id}/operation", response_model=CaseOut)
@@ -418,7 +473,7 @@ def add_operation(id: int, op_data: OperationCreate, db: Session = Depends(get_d
 def get_operations(id: int, db: Session = Depends(get_db)):
     return db.query(Operation).filter(Operation.caseId == id).all()
 
-
+# To delete opeatoins
 @app.delete("/operation/{operation_id}")
 def delete_operation(operation_id: int, db: Session = Depends(get_db)):
     operation = db.query(Operation).filter(Operation.id == operation_id).first()
@@ -429,7 +484,7 @@ def delete_operation(operation_id: int, db: Session = Depends(get_db)):
     db.commit()
     return {"message": "Operation and its steps deleted successfully"}
 
-
+# To Add steps under operation
 @app.post("/operation/{operation_id}/step")
 def add_step_to_operation(operation_id: int, payload: StepCreateSchema, db: Session = Depends(get_db)):
     operation = db.query(Operation).filter(Operation.id == operation_id).first()
@@ -437,10 +492,15 @@ def add_step_to_operation(operation_id: int, payload: StepCreateSchema, db: Sess
     if not operation:
         raise HTTPException(status_code=404, detail="Operation not found")
 
+    # ✅ Extract device from the operation
+    device_from_operation = operation.device
+
+    # ✅ Create new step with device copied
     new_step = Step(
         content=payload.content,
         caseId=operation.caseId,
-        operationId=operation.id
+        operationId=operation.id,
+        device=device_from_operation  # ✅ assign device
     )
 
     db.add(new_step)
@@ -452,12 +512,15 @@ def add_step_to_operation(operation_id: int, payload: StepCreateSchema, db: Sess
         "data": {
             "id": new_step.id,
             "content": new_step.content,
+            "device": new_step.device,  # ✅ return device in response
             "operationId": new_step.operationId,
             "caseId": new_step.caseId,
             "createdAt": new_step.createdAt if hasattr(new_step, "createdAt") else None,
         }
     }
 
+
+# To edit steps under operation
 @app.patch("/step/{step_id}")
 def update_step(step_id: int, payload: StepUpdateSchema, db: Session = Depends(get_db)):
     step = db.query(Step).filter(Step.id == step_id).first()
@@ -469,8 +532,19 @@ def update_step(step_id: int, payload: StepUpdateSchema, db: Session = Depends(g
     db.refresh(step)
     return {"message": "Step updated", "data": step}
 
+# To delete steps under an operation
+@app.delete("/operation/{operation_id}/step/{step_id}")
+def delete_steps_from_operation(operation_id: int, step_id: int, db: Session = Depends(get_db)):
+    print(f"Looking for step {step_id} under operation {operation_id}")
+    step = db.query(Step).filter(Step.id == step_id, Step.operationId == operation_id).first()
 
+    if not step:
+        raise HTTPException(status_code=404, detail='Step not found for this operation')
 
+    db.delete(step)
+    db.commit()
+
+    return {"message": "Step deleted successfully", "step_id": step_id}
 
 
 
@@ -644,13 +718,25 @@ def generate_mapped_steps(data: MappingRequest):
             raise HTTPException(status_code=400, detail="Device not in case")
 
         # Format prompt for Gemini
-        steps_text = "\n".join(case.steps)
+        steps_text = "\n".join([f"{step.device} :: {step.content}" for step in case.steps])
+
         prompt = prompt_template.format(device=device, steps=steps_text)
 
         model = genai.GenerativeModel("gemini-2.0-flash-exp")
         response = model.generate_content(prompt)
         raw_output = response.text.strip()
         print("🧠 Gemini Output:\n", raw_output)
+
+                # Step 1: Fetch Template for this case
+        template_entry = db.query(Template).filter(Template.projectName == case.project_name).first()
+
+        template_data = {}
+        if template_entry:
+            try:
+                template_data = json.loads(template_entry.content)
+            except json.JSONDecodeError:
+                print("⚠️ Template content is not valid JSON.")
+
 
         # Parse Gemini response
         mapped_steps = []
@@ -663,54 +749,98 @@ def generate_mapped_steps(data: MappingRequest):
         if not mapped_steps:
             raise HTTPException(status_code=500, detail="No valid steps parsed")
 
-        # Load template JSON from SQL
-        TEMPLATE_SQL_ID = 1  # 🔁 replace with dynamic logic or config
-        template: Template = (
-            db.query(Template).filter(Template.id == TEMPLATE_SQL_ID).first()
-        )
-        if not template:
-            raise HTTPException(status_code=500, detail="Template not found")
+        # Clear existing mapped steps (optional)
+        db.query(MappedStep).filter(MappedStep.case_id == case.id).delete()
 
-        template_data = template.content  # JSON field from MySQL
+        # Get steps from DB to resolve foreign key relations
+        step_lookup = db.query(Step).filter(Step.caseId == case.id).all()
 
-        # Parse DUT-level structure
-        dut_keys = template_data.get("DUTS", [])
-        if not dut_keys:
-            raise HTTPException(status_code=500, detail="No DUTS key in template")
+        for mapped in mapped_steps:
+            step_raw = mapped.get("step")
+            device_raw = mapped.get("device")
 
-        dut_key = dut_keys[0]  # e.g., "Q_ai"
-        template_dut = template_data.get(dut_key, {})
-        screens = template_dut.get("SCREENS", {})
-        screen_key = list(screens.keys())[0]
-        screen_data = screens.get(screen_key, {})
+            step_text = str(step_raw).strip() if isinstance(step_raw, str) else ""
+            device_name = str(device_raw).strip() if isinstance(device_raw, str) else ""
 
-        elements = screen_data.get("elements", {})
-        ocr_fields = screen_data.get("ocr", {})
 
-        # Enrich mapped steps
-        for step in mapped_steps:
-            param = step.get("parameter")
-            if not param:
+            api = mapped.get("api")
+            parameter = mapped.get("parameter")
+
+            matching_step = next(
+                (s for s in step_lookup if s.content.strip() == step_text and s.device.strip() == device_name),
+                None
+            )
+
+            if not matching_step:
+                print(f"⚠️ Step not found in DB: {step_text} @ {device_name}")
                 continue
 
-            if param.endswith("_icon") or param.endswith("_option"):
-                image_data = elements.get(param, [None, None, None, None, None])[4]
-                if not image_data:
-                    fallback_key = param.replace("_icon", "").replace("_option", "")
-                    image_data = elements.get(
-                        fallback_key, [None, None, None, None, None]
-                    )[4]
-                if image_data:
-                    step["image"] = image_data
+              # Default enrichment
+            # Default enrichment
+            # Default enrichment
+            image = None
+            ocr_field = None
 
-            elif param in ocr_fields:
-                step[param] = ocr_fields[param]
+            if (
+                template_data and
+                isinstance(parameter, str) and
+                device_name in template_data
+            ):
+                try:
+                    device_template = template_data[device_name]
+                    screen_data = device_template.get("SCREENS", {}).get("screen", {})
+                    screen_elements = screen_data.get("elements", {})
+                    ocr_data = screen_data.get("ocr", {})
 
-        # Save mapped steps to MySQL
-        case.mapped_steps = mapped_steps
+                    # 🧠 1. OCR API → fill ocr_field with actual OCR config
+                    if api == "ocr" and parameter in ocr_data:
+                        ocr_field = json.dumps(ocr_data[parameter])  # store full OCR config
+                        print(f"✅ OCR param '{parameter}' → ocr_field set")
+
+                    # 🧠 2. Icon/image step → only fill image
+                    elif parameter in screen_elements:
+                        element_data = screen_elements[parameter]
+                        if isinstance(element_data, list) and len(element_data) >= 4:
+                            image = element_data[3]  # base64 image
+                            print(f"✅ Icon param '{parameter}' → image set")
+
+                except Exception as e:
+                    print(f"❌ Error during enrichment for param '{parameter}':", e)
+
+
+
+            new_mapped = MappedStep(
+                mapped_steps=step_text,
+                api=api,
+                parameter=parameter,
+                operation_id=matching_step.operationId,
+                step_id=matching_step.id,
+                device=device_name,
+                case_id=case.id,
+                image=image,        # Skip enrichment for now
+                ocr_field=ocr_field     # Skip enrichment for now
+            )
+            db.add(new_mapped)
+
         db.commit()
 
-        return {"case_id": case.id, "mapped_steps": mapped_steps}
+        return {
+            "caseId": case.id,
+            "steps": case.steps,
+            "mapped_steps": [
+        {
+            "step": ms.mapped_steps,  # ✅ also fix key name if typo
+            "api": ms.api,
+            "parameter": ms.parameter,
+            "operation_id": ms.operation_id,
+            "step_id": ms.step_id,
+            "device": ms.device,
+            "image": ms.image,
+            "ocr_field": ms.ocr_field
+        }
+        for ms in db.query(MappedStep).filter(MappedStep.case_id == case.id).all()
+    ]
+        }
 
     except Exception as e:
         db.rollback()
@@ -720,8 +850,117 @@ def generate_mapped_steps(data: MappingRequest):
     finally:
         db.close()
 
-    # @app.post("/execute_with_gemini")
-    # async def execute_with_gemini(data: CaptureRequest):
+
+
+# @app.post("/execute_with_gemini")
+# async def execute_with_gemini(data: CaptureRequest):
+#     try:
+#         print(f"\U0001f4f8 Starting action loop for step: {data.step}")
+
+#         case = cases_collection.find_one({"_id": ObjectId(data.case_id)})
+#         if not case:
+#             raise HTTPException(status_code=404, detail="Case not found")
+#             device = case.get("device", "Unknown")
+
+#         attempt = 1
+#         final_response = None
+
+#         while True:
+#             print(f"🔁 Attempt #{attempt} for step: {data.step}")
+
+#             if not data.base64_image or len(data.base64_image) < 100:
+#                 raise HTTPException(
+#                     status_code=400, detail="Invalid or empty base64 image"
+#                 )
+
+#             try:
+#                 image_data = base64.b64decode(data.base64_image)
+#              except Exception as decode_err:
+#                 raise HTTPException(
+#                     status_code=400, detail=f"Base64 decode failed: {decode_err}"
+#                 )
+
+#             filename = f"{data.step}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
+#             image_path = os.path.join(IMAGES_DIR, filename)
+#             with open(image_path, "wb") as f:
+#                 f.write(image_data)
+
+#             image_doc = ImageDocument(
+#                 case_id=ObjectId(data.case_id),
+#                 step=data.step,
+#                 filename=filename,
+#                 created_at=datetime.utcnow().isoformat(),
+#                 device=device,
+#             )
+#             img_result = images_collection.insert_one(
+#                 image_doc.dict(by_alias=True, exclude_none=True)
+#             )
+
+#             ai_result = get_action_recommendation(
+#                 device=device,
+#                 step=data.step,
+#                 image_path=image_path,
+#                 case_id=data.case_id,
+#             )
+
+#             action_result = {}
+#             action_name = ai_result.get("next_api", "").lower()
+
+#             ACTION_HANDLERS = {
+#                 "abort": abort,
+#                 "swipe_up": swipe,
+#                 "swipe_down": swipe,
+#                 "swipe_left": swipe,
+#                 "swipe_right": swipe,
+#                 "detect_and_tap": tap,
+#             }
+
+#             if action_name in ["complete", "abort"]:
+#                 print(f"✅ Step ended with action: {action_name}")
+#                 action_result = {
+#                     "status": "done" if action_name == "complete" else "error",
+#                     "step": data.step,
+#                     "message": f"Step {action_name}ed successfully",
+#                     "action": action_name,
+#                 }
+#                 final_response = {
+#                     "image_url": f"http://localhost:8000/images/{filename}",
+#                     "ai_result": ai_result,
+#                     "action_result": action_result,
+#                 }
+#                 break
+
+#             if action_name in ACTION_HANDLERS:
+#                 action_input = {"step": action_name, "case_id": data.case_id}
+#                 action_result = ACTION_HANDLERS[action_name](action_input)
+
+#                 if "swipe" in action_name and "direction" not in action_result:
+#                     action_result["action"] = "swipe"
+#                     action_result["direction"] = action_name
+
+#             update_data = {"gemini_response": ai_result, "action_result": action_result}
+#             if "coordinates" in action_result:
+#                 update_data["coordinates"] = action_result["coordinates"]
+
+#             images_collection.update_one(
+#                 {"_id": img_result.inserted_id}, {"$set": update_data}
+#             )
+
+#             print("🔄 Re-capturing next screen after action...")
+#             data.base64_image = fetch_fresh_screenshot()
+
+#             attempt += 1
+
+#         return final_response
+
+#     except Exception as e:
+#         print("🔥 Image capture error:", e)
+#         raise HTTPException(status_code=500, detail=str(e))
+
+
+
+# @app.post("/execute_with_gemini")
+# async def execute_with_gemini(data: CaptureRequest):
     try:
         print(f"\U0001f4f8 Starting action loop for step: {data.step}")
 
@@ -825,113 +1064,8 @@ def generate_mapped_steps(data: MappingRequest):
         print("🔥 Image capture error:", e)
         raise HTTPException(status_code=500, detail=str(e))
 
-    # @app.post("/execute_with_gemini")
-    # async def execute_with_gemini(data: CaptureRequest):
-    try:
-        print(f"\U0001f4f8 Starting action loop for step: {data.step}")
-
-        case = cases_collection.find_one({"_id": ObjectId(data.case_id)})
-        if not case:
-            raise HTTPException(status_code=404, detail="Case not found")
-        device = case.get("device", "Unknown")
-
-        attempt = 1
-        final_response = None
-
-        while True:
-            print(f"🔁 Attempt #{attempt} for step: {data.step}")
-
-            if not data.base64_image or len(data.base64_image) < 100:
-                raise HTTPException(
-                    status_code=400, detail="Invalid or empty base64 image"
-                )
-
-            try:
-                image_data = base64.b64decode(data.base64_image)
-            except Exception as decode_err:
-                raise HTTPException(
-                    status_code=400, detail=f"Base64 decode failed: {decode_err}"
-                )
-
-            filename = f"{data.step}_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"
-            image_path = os.path.join(IMAGES_DIR, filename)
-            with open(image_path, "wb") as f:
-                f.write(image_data)
-
-            image_doc = ImageDocument(
-                case_id=ObjectId(data.case_id),
-                step=data.step,
-                filename=filename,
-                created_at=datetime.utcnow().isoformat(),
-                device=device,
-            )
-            img_result = images_collection.insert_one(
-                image_doc.dict(by_alias=True, exclude_none=True)
-            )
-
-            ai_result = get_action_recommendation(
-                device=device,
-                step=data.step,
-                image_path=image_path,
-                case_id=data.case_id,
-            )
-
-            action_result = {}
-            action_name = ai_result.get("next_api", "").lower()
-
-            ACTION_HANDLERS = {
-                "abort": abort,
-                "swipe_up": swipe,
-                "swipe_down": swipe,
-                "swipe_left": swipe,
-                "swipe_right": swipe,
-                "detect_and_tap": tap,
-            }
-
-            if action_name in ["complete", "abort"]:
-                print(f"✅ Step ended with action: {action_name}")
-                action_result = {
-                    "status": "done" if action_name == "complete" else "error",
-                    "step": data.step,
-                    "message": f"Step {action_name}ed successfully",
-                    "action": action_name,
-                }
-                final_response = {
-                    "image_url": f"http://localhost:8000/images/{filename}",
-                    "ai_result": ai_result,
-                    "action_result": action_result,
-                }
-                break
-
-            if action_name in ACTION_HANDLERS:
-                action_input = {"step": action_name, "case_id": data.case_id}
-                action_result = ACTION_HANDLERS[action_name](action_input)
-
-                if "swipe" in action_name and "direction" not in action_result:
-                    action_result["action"] = "swipe"
-                    action_result["direction"] = action_name
-
-            update_data = {"gemini_response": ai_result, "action_result": action_result}
-            if "coordinates" in action_result:
-                update_data["coordinates"] = action_result["coordinates"]
-
-            images_collection.update_one(
-                {"_id": img_result.inserted_id}, {"$set": update_data}
-            )
-
-            print("🔄 Re-capturing next screen after action...")
-            data.base64_image = fetch_fresh_screenshot()
-
-            attempt += 1
-
-        return final_response
-
-    except Exception as e:
-        print("🔥 Image capture error:", e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-    # @app.post("/execute_manual_step")
-    # async def execute_manual_step(data: StepExecutionRequest):  # expects case_id + step_name
+# @app.post("/execute_manual_step")
+# async def execute_manual_step(data: StepExecutionRequest):  # expects case_id + step_name
     try:
         case = cases_collection.find_one({"_id": ObjectId(data.case_id)})
         if not case:
@@ -1030,6 +1164,35 @@ def generate_mapped_steps(data: MappingRequest):
 
 
 
+@app.get("/cases/{case_id}/mapped-steps")
+def get_mapped_steps(case_id: int, db: Session = Depends(get_db)):
+    try:
+        # Fetch mapped steps for the given case, ordered by operation_id
+        mapped_steps = db.query(MappedStep).filter(
+            MappedStep.case_id == case_id
+        ).order_by(MappedStep.operation_id.asc()).all()
+
+        return {
+            "caseId": case_id,
+            "mapped_steps": [
+                {
+                    "step": ms.mapped_steps,
+                    "api": ms.api,
+                    "parameter": ms.parameter,
+                    "operation_id": ms.operation_id,
+                    "step_id": ms.step_id,
+                    "device": ms.device,
+                    "image": ms.image,
+                    "ocr_field": ms.ocr_field
+                }
+                for ms in mapped_steps
+            ]
+        }
+
+    except Exception as e:
+        print("❌ Error fetching mapped steps:", e)
+        raise HTTPException(status_code=500, detail="Error retrieving mapped steps")
+
 
 
 
@@ -1052,9 +1215,32 @@ def get_steps(db: Session = Depends(get_db)):
     return db.query(models.Step).all()
 
 
+# @app.get("/templates")
+# def get_templates(db: Session = Depends(get_db)):
+#     return db.query(models.Template).all()
+
+
 @app.get("/templates")
 def get_templates(db: Session = Depends(get_db)):
-    return db.query(models.Template).all()
+    results = db.query(
+        models.Template.id,
+        models.Template.projectName,
+        func.substr(models.Template.content, 1, 50).label("preview"),  # Get first 50 chars
+        models.Template.duts,
+        models.Template.createdAt
+    ).all()
+
+    return [
+        {
+            "id": r.id,
+            "projectName": r.projectName,
+            "content_preview": r.preview,
+            "duts": r.duts,
+            "createdAt": r.createdAt
+        }
+        for r in results
+    ]
+
 
 
 @app.delete("/cases/{case_id}")

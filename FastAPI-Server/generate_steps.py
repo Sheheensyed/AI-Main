@@ -126,108 +126,170 @@ You are an intelligent assistant that decomposes user requests into structured r
 Convert a user query into a structured **list of goals**, each with:
 - A clear "goal": what is to be achieved at a high level
 - A "prerequisite": what must be true before that goal can be started
-- A "step": specific robot instructions as either:
-  - a string for a single action
-  - a list of strings for multiple substeps under the same goal
+- A "step": specific robot instructions, either:
+  - A single step as a dictionary:
+    - "step": the instruction (always prefixed with device name)
+    - "visual_description": a 2–3 word VLM tag **starting with 'Locate' or 'Detect'**
+  - Or a list of such step dictionaries for multiple substeps under the same goal
 
 ### DEVICE AWARENESS:
 Devices involved:
 {device_list}
 
-- If only 1 device: DO NOT prefix steps with the device name
-- If 2 or more devices: prefix each step with the device name (e.g., "On iPhone13: Find and tap Settings")
+- **Always prefix each goal and step with the device name using "On [Device]:" format**
+- **Strict Rule: DO NOT change or reformat the device name. Use it exactly as provided in the input.**
 
 ### RULES:
 - Each item in the JSON list is **one goal**
 - Subgoals MUST be separated out if one goal depends on another
 - Use proper nesting: e.g., before checking iOS version, Settings → General → About must be opened first
-- If query involves both Android and iOS, create separate parallel goals for each device
+- If query involves multiple devices, create separate parallel goals for each device
 
-### INSTRUCTIONS:
-- Use the phrase **"Find and tap"** for UI interactions
-- Use **"Find"** if it only requires reading/locating an element (no interaction)
-- Prerequisite should describe the necessary state (e.g., "Settings is open", or "Phone is on Home screen")
-- Steps should be practical and brief
-- Maintain strict JSON format with only array of objects (no markdown, no commentary)
+### STEP FORMAT:
+- "step": Robot-readable instruction, prefixed with "On [Device]:"
+- "visual_description": Begin with **Locate** or **Detect**, and use 2–3 words only
+  - Examples:  
+    - `"Locate Settings icon"`  
+    - `"Detect About button"`  
+    - `"Locate iOS version"`  
+    - `"Detect Wi-Fi label"`
+
+---
 
 ### EXAMPLES:
 
-#### Single device: "Find iOS version"
+#### ✅ Single Device: "Find iOS version" on Apple
 [
   {{
-    "goal": "Open Settings",
-    "prerequisite": "Phone is on Home screen",
-    "step": "Find and tap Settings"
+    "goal": "On Apple: Open Settings",
+    "prerequisite": "Apple is on Home screen",
+    "step": {{
+      "step": "On Apple: Find and tap Settings",
+      "visual_description": "Locate Settings icon"
+    }}
   }},
   {{
-    "goal": "Find iOS version",
-    "prerequisite": "Settings is open",
+    "goal": "On Apple: Find iOS version",
+    "prerequisite": "Settings is open on Apple",
     "step": [
-      "Find and tap General",
-      "Find and tap About",
-      "Find iOS version"
+      {{
+        "step": "On Apple: Find and tap General",
+        "visual_description": "Locate General option"
+      }},
+      {{
+        "step": "On Apple: Find and tap About",
+        "visual_description": "Detect About button"
+      }},
+      {{
+        "step": "On Apple: Find iOS version",
+        "visual_description": "Locate iOS version"
+      }}
     ]
   }}
 ]
 
-#### Multi-device: "Find iOS version on iPhone13 and Android version on Pixel6"
+---
+
+#### ✅ Double DUT: "Find iOS version on iPhone14 and Android version on GalaxyS22"
 [
   {{
-    "goal": "Open Settings on iPhone13",
-    "prerequisite": "iPhone13 is on Home screen",
-    "step": "On iPhone13: Find and tap Settings"
+    "goal": "On iPhone14: Open Settings",
+    "prerequisite": "iPhone14 is on Home screen",
+    "step": {{
+      "step": "On iPhone14: Find and tap Settings",
+      "visual_description": "Locate Settings icon"
+    }}
   }},
   {{
-    "goal": "Find iOS version",
-    "prerequisite": "Settings is open on iPhone13",
+    "goal": "On iPhone14: Find iOS version",
+    "prerequisite": "Settings is open on iPhone14",
     "step": [
-      "On iPhone13: Find and tap General",
-      "On iPhone13: Find and tap About",
-      "On iPhone13: Find iOS version"
+      {{
+        "step": "On iPhone14: Find and tap General",
+        "visual_description": "Locate General option"
+      }},
+      {{
+        "step": "On iPhone14: Find and tap About",
+        "visual_description": "Detect About button"
+      }},
+      {{
+        "step": "On iPhone14: Find iOS version",
+        "visual_description": "Locate iOS version"
+      }}
     ]
   }},
   {{
-    "goal": "Open Settings on Pixel6",
-    "prerequisite": "Pixel6 is on Home screen",
-    "step": "On Pixel6: Find and tap Settings"
+    "goal": "On GalaxyS22: Open Settings",
+    "prerequisite": "GalaxyS22 is on Home screen",
+    "step": {{
+      "step": "On GalaxyS22: Find and tap Settings",
+      "visual_description": "Locate Settings icon"
+    }}
   }},
   {{
-    "goal": "Find Android version",
-    "prerequisite": "Settings is open on Pixel6",
+    "goal": "On GalaxyS22: Find Android version",
+    "prerequisite": "Settings is open on GalaxyS22",
     "step": [
-      "On Pixel6: Find and tap About phone",
-      "On Pixel6: Find Android version"
+      {{
+        "step": "On GalaxyS22: Find and tap About phone",
+        "visual_description": "Detect About phone"
+      }},
+      {{
+        "step": "On GalaxyS22: Find and tap Software Information",
+        "visual_description": "Locate Software info"
+      }},
+      {{
+        "step": "On GalaxyS22: Read Android version",
+        "visual_description": "Detect Android version"
+      }}
     ]
   }}
 ]
+
+---
 
 ### OUTPUT FORMAT:
-Strict JSON array like:
-[
-  {{
-    "goal": "....",
-    "prerequisite": "....",
-    "step": "..." or ["...", "..."]
-  }},
-  ...
-]
+A strict JSON array of objects.  
+Each object must include:
+- `"goal"`: prefixed with "On [Device]:"
+- `"prerequisite"`
+- `"step"`:
+  - Either one object with `"step"` + `"visual_description"` (2–3 words starting with "Locate"/"Detect")
+  - Or a list of such objects for multiple steps
 
-Now convert this user query to the expected output format:
+Now convert this user query to the expected format:  
 User Query: {user_query}
 """
 
+
+
+
 # Extract clean JSON array from text using regex fallback
 def extract_json_array(text):
+    # Clean markdown code block if present
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+
     try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        match = re.search(r"\[\s*{.*?}\s*\]", text, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except:
-                return [{"error": "Failed to parse valid JSON from Gemini response"}]
-        return [{"error": "No JSON array found in response", "raw": text}]
+        parsed = json.loads(cleaned)
+        if isinstance(parsed, list):
+            return parsed
+    except json.JSONDecodeError as e:
+        print("❌ JSON parse error:", e)
+
+    # Fallback to regex
+    match = re.search(r"\[\s*{.*?}\s*]", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(0))
+        except:
+            return [{"error": "Regex JSON parse failed"}]
+
+    return [{"error": "No valid JSON found", "raw": text}]
+
+
 
 # Generate structured goals from query
 def generate_steps(user_query, device_names):
@@ -235,9 +297,13 @@ def generate_steps(user_query, device_names):
     device_list_str = "\n".join([f"- {d}" for d in device_names])
     prompt = prompt_template_nested.format(
         device_list=device_list_str,
-        user_query= user_query
+        user_query=user_query
     )
+
     response = model.generate_content(prompt)
+    
+    print("🔍 Gemini raw response:\n", response.text[:1000])  # Truncate for readability
+    
     return extract_json_array(response.text)
 
 

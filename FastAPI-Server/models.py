@@ -27,6 +27,7 @@ class Case(Base):
         "MappedStep", back_populates="case", cascade="all, delete"
     )
     operations = relationship("Operation", back_populates="case", cascade="all, delete-orphan")
+    mapped_steps = relationship("MappedStep", back_populates="case", cascade="all, delete-orphan")
 
 
 class Step(Base):
@@ -35,7 +36,9 @@ class Step(Base):
     id = Column(Integer, primary_key=True, index=True)
     content = Column(Text, nullable=False)
     caseId = Column(Integer, ForeignKey("case.id"), nullable=False)
+    device = Column(String)  # ✅ Add this line
     operationId = Column(Integer, ForeignKey("operation.id"), nullable=True)  # New
+    visual_description = Column(Text, nullable=True)
 
     case = relationship("Case", back_populates="steps")
     operation = relationship("Operation", back_populates="steps")
@@ -45,12 +48,19 @@ class MappedStep(Base):
     __tablename__ = "mappedstep"
 
     id = Column(Integer, primary_key=True, index=True)
-    step = Column(Text, nullable=False)
-    api = Column(Text, nullable=False)
-    parameter = Column(Text, nullable=False)
-    caseId = Column(Integer, ForeignKey("case.id"), nullable=False)
+    mapped_steps = Column(String, nullable=False)
+    api = Column(String)
+    parameter = Column(String)
+    ocr_field = Column(String)
+    operation_id = Column(Integer)
+    step_id = Column(Integer)
+    device = Column(String)
+    image = Column(String)
+    case_id = Column(Integer, ForeignKey("case.id"))
 
+    # ✅ This line adds the `case` property
     case = relationship("Case", back_populates="mapped_steps")
+
 
 
 class Operation(Base):
@@ -61,6 +71,7 @@ class Operation(Base):
     goal = Column(Text, nullable=False)
     prerequisite = Column(String, nullable=True)
     caseId = Column(Integer, ForeignKey("case.id"), nullable=False)
+    device = Column(String(255), nullable=True)  # ✅ ADD THIS LINE
 
     case = relationship("Case", back_populates="operations")
     steps = relationship("Step", back_populates="operation", cascade="all, delete-orphan")
@@ -74,3 +85,4 @@ class Template(Base):
     content = Column(Text, nullable=True)  # If JSON not supported, use Text instead
     duts = Column(JSON, nullable=True)  # Store DUT list as JSON
     createdAt = Column(DateTime(timezone=True), server_default=func.now())
+
